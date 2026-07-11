@@ -11,9 +11,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Purrfect Pitch — Tuner & Metronome',
+        name: 'Purrfect Pitch — Tuner, Metronome & Sight Reading',
         short_name: 'Purrfect',
-        description: 'Cute cat chromatic tuner with adjustable A4 reference, plus a metronome',
+        description: 'Cute cat chromatic tuner with adjustable A4 reference, a metronome, and a mic-checked sight-reading trainer',
         theme_color: '#fff1dc',
         background_color: '#fff1dc',
         display: 'standalone',

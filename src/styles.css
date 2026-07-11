@@ -67,7 +67,7 @@ button {
 
 .mode-toggle {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   padding: 4px;
   border: 2px solid var(--border);
@@ -81,7 +81,7 @@ button {
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.02em;
   transition: background 0.15s, color 0.15s;
@@ -495,6 +495,125 @@ button {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* ---- Sight reading ---- */
+
+.reading .cat-stage {
+  margin-top: 4px;
+}
+
+.reading-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  width: 100%;
+  min-height: 20px;
+}
+
+.reading-key {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.reading-stats {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-box {
+  position: relative;
+  width: 100%;
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  background: #fff;
+  padding: 6px 8px;
+  overflow: hidden;
+}
+
+.score-canvas {
+  width: 100%;
+}
+
+.score-canvas svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.score-placeholder {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-height: 150px;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.score-placeholder p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.score-summary {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(255, 253, 248, 0.88);
+}
+
+.score-summary-result {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--happy);
+}
+
+.reading-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.reading-controls .primary-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.secondary-btn {
+  flex: 1;
+  padding: 14px 0;
+  border: 2px dashed #d9bd97;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.secondary-btn:active {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.check-row input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
 }
 
 /* ---- Metronome ---- */

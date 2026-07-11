@@ -1,6 +1,6 @@
-# Tuner & Metronome
+# Tuner, Metronome & Sight Reading
 
-An installable PWA (React + TypeScript + Vite) with two tools you can toggle between:
+An installable PWA (React + TypeScript + Vite) with three tools you can toggle between:
 
 - **Tuner** — chromatic tuner using the microphone and autocorrelation pitch
   detection. The A4 reference pitch is adjustable (400–480 Hz, e.g. 442 Hz)
@@ -8,6 +8,14 @@ An installable PWA (React + TypeScript + Vite) with two tools you can toggle bet
 - **Metronome** — Web Audio lookahead scheduler for drift-free clicks, with
   tempo control (30–240 BPM via slider, nudge buttons, and tap tempo), beats
   per bar with an accented downbeat, and a visual beat indicator.
+- **Sight Read** — random notation rendered with VexFlow in a random key
+  (signature-aware, with chromatic accidentals on hard difficulty); the mic
+  listens while you play and the cursor advances when you hit the right pitch.
+  Correct notes turn green (orange if you missed first), wrong attempts flash
+  red, and a first-try score is tallied per line. Difficulty, key mode, notes
+  per line, and strict ±30¢ intonation are configurable and persisted. It
+  shares the tuner's A4 reference and microphone preference. Pitch detection
+  is monophonic — play single notes.
 
 ## Development
 
