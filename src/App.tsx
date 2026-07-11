@@ -1,6 +1,7 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense } from 'react';
 import Tuner from './components/Tuner';
 import Metronome from './components/Metronome';
+import { usePersistentState } from './hooks/usePersistentState';
 
 // VexFlow is heavy — only load it when the sight-reading tab is opened
 const SightReading = lazy(() => import('./components/SightReading'));
@@ -14,7 +15,9 @@ const MODES: { id: Mode; label: string }[] = [
 ];
 
 export default function App() {
-  const [mode, setMode] = useState<Mode>('tuner');
+  const [mode, setMode] = usePersistentState<Mode>('app.mode', 'tuner', (stored) =>
+    MODES.some((m) => m.id === stored) ? (stored as Mode) : 'tuner',
+  );
 
   return (
     <div className="app">

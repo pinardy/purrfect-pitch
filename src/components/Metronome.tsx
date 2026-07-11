@@ -1,10 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { MAX_BPM, MetronomeEngine, MIN_BPM } from '../audio/metronome';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { useWakeLock } from '../hooks/useWakeLock';
 import CatFace from './CatFace';
 
 const MIN_BEATS = 1;
 const MAX_BEATS = 8;
+
+function clampBpm(value: unknown): number {
+  const n = typeof value === 'number' && Number.isFinite(value) ? value : 120;
+  return Math.min(MAX_BPM, Math.max(MIN_BPM, Math.round(n)));
+}
+
+function clampBeats(value: unknown): number {
+  const n = typeof value === 'number' && Number.isFinite(value) ? value : 4;
+  return Math.min(MAX_BEATS, Math.max(MIN_BEATS, Math.round(n)));
+}
 
 function tempoName(bpm: number): string {
   if (bpm < 60) return 'Largo';
@@ -17,8 +28,8 @@ function tempoName(bpm: number): string {
 }
 
 export default function Metronome() {
-  const [bpm, setBpm] = useState(120);
-  const [beatsPerBar, setBeatsPerBar] = useState(4);
+  const [bpm, setBpm] = usePersistentState('metronome.bpm', 120, clampBpm);
+  const [beatsPerBar, setBeatsPerBar] = usePersistentState('metronome.beats', 4, clampBeats);
   const [playing, setPlaying] = useState(false);
   const [activeBeat, setActiveBeat] = useState(-1);
 
