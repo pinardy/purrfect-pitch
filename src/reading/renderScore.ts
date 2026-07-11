@@ -17,6 +17,11 @@ const COLORS: Record<NoteStatus, string> = {
 
 const CURSOR_FILL = 'rgba(244, 114, 166, 0.16)';
 
+/** Minimum horizontal room per note; below this the line widens and scrolls. */
+const MIN_NOTE_SPACING = 56;
+/** Room reserved for clef, key signature, and stave margins. */
+const LEFT_FIXTURES = 140;
+
 export interface RenderScoreOptions {
   notes: SpelledNote[];
   statuses: NoteStatus[];
@@ -26,16 +31,23 @@ export interface RenderScoreOptions {
   width: number;
 }
 
-export function renderScore(el: HTMLDivElement, o: RenderScoreOptions): void {
+/**
+ * Renders the exercise line. When `o.width` is too narrow to give each note
+ * MIN_NOTE_SPACING, the drawing widens beyond the container (which then
+ * scrolls horizontally). Returns the current note's center x for scrolling
+ * it into view, or null when there is no current note.
+ */
+export function renderScore(el: HTMLDivElement, o: RenderScoreOptions): number | null {
   el.innerHTML = ''; // idempotent: survives StrictMode double-effect and re-renders
-  if (o.notes.length === 0 || o.width < 100) return;
+  if (o.notes.length === 0 || o.width < 100) return null;
 
+  const width = Math.max(o.width, LEFT_FIXTURES + o.notes.length * MIN_NOTE_SPACING);
   const height = 170;
   const renderer = new Renderer(el, Renderer.Backends.SVG);
-  renderer.resize(o.width, height);
+  renderer.resize(width, height);
   const ctx = renderer.getContext();
 
-  const stave = new Stave(10, 30, o.width - 20);
+  const stave = new Stave(10, 30, width - 20);
   stave.addClef('treble').addKeySignature(o.keySignature);
   stave.setContext(ctx).draw();
 
@@ -53,7 +65,7 @@ export function renderScore(el: HTMLDivElement, o: RenderScoreOptions): void {
   // renders accidentals only where the pitch deviates from the key signature
   // or from earlier accidentals in the bar
   Accidental.applyAccidentals([voice], o.keySignature);
-  new Formatter().joinVoices([voice]).format([voice], o.width - 140);
+  new Formatter().joinVoices([voice]).format([voice], width - LEFT_FIXTURES);
   voice.draw(ctx, stave);
 
   // translucent cursor highlight behind the current note (needs post-draw layout)
@@ -69,5 +81,7 @@ export function renderScore(el: HTMLDivElement, o: RenderScoreOptions): void {
     rect.setAttribute('rx', '6');
     rect.setAttribute('fill', CURSOR_FILL);
     svg.insertBefore(rect, svg.firstChild);
+    return bb.x + bb.w / 2;
   }
+  return null;
 }

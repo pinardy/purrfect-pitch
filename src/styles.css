@@ -534,11 +534,11 @@ button {
 
 .score-canvas {
   width: 100%;
+  overflow-x: auto;
 }
 
 .score-canvas svg {
   display: block;
-  width: 100%;
   height: auto;
 }
 

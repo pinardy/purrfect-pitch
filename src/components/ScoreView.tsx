@@ -27,7 +27,11 @@ export default function ScoreView({ notes, statuses, cursor, keySignature }: Pro
   useEffect(() => {
     const el = containerRef.current;
     if (!el || width === 0) return;
-    renderScore(el, { notes, statuses, cursor, keySignature, width });
+    const cursorX = renderScore(el, { notes, statuses, cursor, keySignature, width });
+    // when the line is wider than the viewport, keep the current note centered
+    if (cursorX !== null && el.scrollWidth > el.clientWidth) {
+      el.scrollTo({ left: cursorX - el.clientWidth / 2, behavior: 'smooth' });
+    }
   }, [notes, statuses, cursor, keySignature, width]);
 
   return <div ref={containerRef} className="score-canvas" />;
