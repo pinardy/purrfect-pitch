@@ -11,11 +11,13 @@ interface Props {
 }
 
 export default function ScoreView({ notes, statuses, cursor, keySignature }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const notesRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
   useEffect(() => {
-    const el = containerRef.current;
+    const el = wrapRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       setWidth(Math.floor(entries[0].contentRect.width));
@@ -25,14 +27,20 @@ export default function ScoreView({ notes, statuses, cursor, keySignature }: Pro
   }, []);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el || width === 0) return;
-    const cursorX = renderScore(el, { notes, statuses, cursor, keySignature, width });
+    const headerEl = headerRef.current;
+    const notesEl = notesRef.current;
+    if (!headerEl || !notesEl || width === 0) return;
+    const cursorX = renderScore(headerEl, notesEl, { notes, statuses, cursor, keySignature, width });
     // when the line is wider than the viewport, keep the current note centered
-    if (cursorX !== null && el.scrollWidth > el.clientWidth) {
-      el.scrollTo({ left: cursorX - el.clientWidth / 2, behavior: 'smooth' });
+    if (cursorX !== null && notesEl.scrollWidth > notesEl.clientWidth) {
+      notesEl.scrollTo({ left: cursorX - notesEl.clientWidth / 2, behavior: 'smooth' });
     }
   }, [notes, statuses, cursor, keySignature, width]);
 
-  return <div ref={containerRef} className="score-canvas" />;
+  return (
+    <div ref={wrapRef} className="score-line">
+      <div ref={headerRef} className="score-clef" />
+      <div ref={notesRef} className="score-canvas" />
+    </div>
+  );
 }

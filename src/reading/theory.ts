@@ -26,6 +26,12 @@ export function vexKey(n: SpelledNote): string {
   return `${n.letter.toLowerCase()}${n.acc}/${n.octave}`;
 }
 
+/** Display name for a spelled note as written, e.g. "F♯4" */
+export function spelledName(n: SpelledNote): string {
+  const acc = n.acc === '#' ? '♯' : n.acc === 'b' ? '♭' : '';
+  return `${n.letter}${acc}${n.octave}`;
+}
+
 const PC_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 
 /** Display name for a raw MIDI number (sharp spelling), e.g. 61 -> "C♯4" */

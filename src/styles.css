@@ -532,11 +532,23 @@ button {
   overflow: hidden;
 }
 
-.score-canvas {
+.score-line {
+  display: flex;
   width: 100%;
-  overflow-x: auto;
 }
 
+.score-clef {
+  flex: none;
+}
+
+.score-canvas {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.score-clef svg,
 .score-canvas svg {
   display: block;
   height: auto;
@@ -580,6 +592,72 @@ button {
   align-items: center;
   gap: 12px;
   width: 100%;
+}
+
+.note-accuracy {
+  width: 100%;
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 10px 14px;
+  background: #fff;
+}
+
+.note-accuracy summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.note-acc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.note-acc-row {
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.note-acc-name {
+  font-weight: 700;
+}
+
+.note-acc-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #f4e8d6;
+  overflow: hidden;
+}
+
+.note-acc-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.note-acc-row[data-grade='good'] .note-acc-bar span { background: #2f9e4d; }
+.note-acc-row[data-grade='ok'] .note-acc-bar span { background: #e8871e; }
+.note-acc-row[data-grade='bad'] .note-acc-bar span { background: #e0554f; }
+
+.note-acc-pct {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.note-acc-reset {
+  flex: none;
+  width: 100%;
+  padding: 10px 0;
+  font-size: 14px;
 }
 
 .reading-controls .primary-btn {

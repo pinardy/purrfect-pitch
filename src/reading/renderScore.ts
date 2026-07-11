@@ -1,7 +1,8 @@
 // VexFlow rendering of one exercise line with per-note coloring and a
-// translucent cursor behind the current note.
+// translucent cursor behind the current note. The clef and key signature are
+// drawn into a separate element so they stay pinned while the notes scroll.
 
-import { Accidental, Formatter, Renderer, Stave, StaveNote, Voice } from 'vexflow';
+import { Accidental, BarlineType, Formatter, Renderer, Stave, StaveNote, Voice } from 'vexflow';
 import type { SpelledNote } from './theory';
 import { vexKey } from './theory';
 
@@ -19,8 +20,9 @@ const CURSOR_FILL = 'rgba(244, 114, 166, 0.16)';
 
 /** Minimum horizontal room per note; below this the line widens and scrolls. */
 const MIN_NOTE_SPACING = 56;
-/** Room reserved for clef, key signature, and stave margins. */
-const LEFT_FIXTURES = 140;
+
+const HEIGHT = 170;
+const STAVE_Y = 30;
 
 export interface RenderScoreOptions {
   notes: SpelledNote[];
@@ -28,27 +30,48 @@ export interface RenderScoreOptions {
   cursor: number;
   /** VexFlow key signature name, e.g. 'D', 'Bb', 'Em' */
   keySignature: string;
+  /** total width available for header + notes */
   width: number;
 }
 
+/** Draws the pinned clef + key signature header; returns its width. */
+function renderHeader(el: HTMLDivElement, keySignature: string): number {
+  const renderer = new Renderer(el, Renderer.Backends.SVG);
+  renderer.resize(220, HEIGHT);
+  const ctx = renderer.getContext();
+  const stave = new Stave(0, STAVE_Y, 220);
+  stave.addClef('treble').addKeySignature(keySignature);
+  stave.setContext(ctx).draw();
+  // crop the SVG to just the clef + key signature
+  const width = Math.ceil(stave.getNoteStartX());
+  renderer.resize(width, HEIGHT);
+  return width;
+}
+
 /**
- * Renders the exercise line. When `o.width` is too narrow to give each note
- * MIN_NOTE_SPACING, the drawing widens beyond the container (which then
- * scrolls horizontally). Returns the current note's center x for scrolling
- * it into view, or null when there is no current note.
+ * Renders the exercise line: clef + key signature into `headerEl` (fixed) and
+ * the notes into `notesEl` (scrolls when narrower than the line). Returns the
+ * current note's center x within `notesEl`, or null when there is none.
  */
-export function renderScore(el: HTMLDivElement, o: RenderScoreOptions): number | null {
-  el.innerHTML = ''; // idempotent: survives StrictMode double-effect and re-renders
+export function renderScore(
+  headerEl: HTMLDivElement,
+  notesEl: HTMLDivElement,
+  o: RenderScoreOptions,
+): number | null {
+  // idempotent: survives StrictMode double-effect and re-renders
+  headerEl.innerHTML = '';
+  notesEl.innerHTML = '';
   if (o.notes.length === 0 || o.width < 100) return null;
 
-  const width = Math.max(o.width, LEFT_FIXTURES + o.notes.length * MIN_NOTE_SPACING);
-  const height = 170;
-  const renderer = new Renderer(el, Renderer.Backends.SVG);
-  renderer.resize(width, height);
+  const headerWidth = renderHeader(headerEl, o.keySignature);
+
+  const width = Math.max(o.width - headerWidth, o.notes.length * MIN_NOTE_SPACING + 30);
+  const renderer = new Renderer(notesEl, Renderer.Backends.SVG);
+  renderer.resize(width, HEIGHT);
   const ctx = renderer.getContext();
 
-  const stave = new Stave(10, 30, width - 20);
-  stave.addClef('treble').addKeySignature(o.keySignature);
+  const stave = new Stave(0, STAVE_Y, width);
+  stave.setBegBarType(BarlineType.NONE); // staff lines continue from the header
   stave.setContext(ctx).draw();
 
   const staveNotes = o.notes.map((n, i) => {
@@ -65,12 +88,12 @@ export function renderScore(el: HTMLDivElement, o: RenderScoreOptions): number |
   // renders accidentals only where the pitch deviates from the key signature
   // or from earlier accidentals in the bar
   Accidental.applyAccidentals([voice], o.keySignature);
-  new Formatter().joinVoices([voice]).format([voice], width - LEFT_FIXTURES);
+  new Formatter().joinVoices([voice]).format([voice], width - 40);
   voice.draw(ctx, stave);
 
   // translucent cursor highlight behind the current note (needs post-draw layout)
   const currentNote = staveNotes[o.cursor];
-  const svg = el.querySelector('svg');
+  const svg = notesEl.querySelector('svg');
   if (currentNote && svg) {
     const bb = currentNote.getBoundingBox();
     const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');

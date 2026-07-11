@@ -3,12 +3,19 @@ import { autoCorrelate } from '../audio/pitch';
 import { useWakeLock } from '../hooks/useWakeLock';
 import CatFace, { type CatMood } from './CatFace';
 import ScoreView from './ScoreView';
+import NoteAccuracy from './NoteAccuracy';
 import ReadingSettings from './ReadingSettings';
 import { clampA4, DEFAULT_A4 } from './TunerSettings';
 import { NoteMatcher, toPitchFrame } from '../reading/matcher';
 import { exerciseReducer, INITIAL_LINE_STATE, lineScore } from '../reading/exercise';
 import { generateLine, mulberry32 } from '../reading/generator';
 import { keyLabel, midiToName, vexKeySignature } from '../reading/theory';
+import {
+  loadNoteStats,
+  saveNoteStats,
+  withNoteResult,
+  type NoteStats,
+} from '../reading/noteStats';
 import {
   loadReadingSettings,
   PRESETS,
@@ -43,6 +50,7 @@ export default function SightReading() {
   const [settings, setSettings] = useState<Settings>(loadReadingSettings);
   const [showSettings, setShowSettings] = useState(false);
   const [stats, setStats] = useState<SessionStats>({ lines: 0, notes: 0, firstTry: 0 });
+  const [noteStats, setNoteStats] = useState<NoteStats>(loadNoteStats);
   const [heard, setHeard] = useState<{ midi: number; cents: number } | null>(null);
   const [wrongFlash, setWrongFlash] = useState(false);
   const [happyFlash, setHappyFlash] = useState(false);
@@ -165,6 +173,9 @@ export default function SightReading() {
         if (event && lineRef.current.phase === 'playing') {
           if (event.type === 'correct') {
             const current = lineRef.current;
+            setNoteStats((s) =>
+              withNoteResult(s, current.notes[current.cursor], current.wrongCounts[current.cursor] > 0),
+            );
             const nextCursor = current.cursor + 1;
             matcherRef.current.setTarget(
               nextCursor < current.notes.length ? current.notes[nextCursor].midi : null,
@@ -192,6 +203,10 @@ export default function SightReading() {
   useEffect(() => {
     if (listening && line.phase === 'idle') newLine();
   }, [listening, line.phase, newLine]);
+
+  useEffect(() => {
+    saveNoteStats(noteStats);
+  }, [noteStats]);
 
   // record stats + auto-advance when a line completes
   useEffect(() => {
@@ -305,6 +320,8 @@ export default function SightReading() {
           </button>
         )}
       </div>
+
+      <NoteAccuracy stats={noteStats} onReset={() => setNoteStats({})} />
 
       {showSettings && (
         <ReadingSettings
