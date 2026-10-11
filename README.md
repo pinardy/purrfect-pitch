@@ -50,7 +50,10 @@ An installable PWA (React + TypeScript + Vite) with three tools you can toggle b
     Fingerings (finger above, string I–IV below where it changes) can be
     shown always, only after you tap the staff, only after a slip, or never;
     open strings can be fingered 0. A fingerboard diagram under the staff
-    shows the hand frame with the current note marked.
+    shows the hand frame with the current note marked, a ruler above it
+    marking where every position's first finger lands, and a faint outline of
+    the 1st-position home frame whenever the hand is higher, so you can see
+    how far the current position sits from home.
   - **Shifting** — "Practise the shift" moves each line between a chosen
     origin position (1st by default) and the target, with one to three
     shifts a line, always ending in the target. Each shift note gets a dash

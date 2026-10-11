@@ -880,7 +880,7 @@ button {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 110px;
+  max-height: 140px;
 }
 
 .fb-board {
@@ -915,6 +915,42 @@ button {
   fill: none;
   stroke: rgba(244, 114, 166, 0.6);
   stroke-dasharray: 3 3;
+}
+
+/* 1st-position home frame, for orientation when the hand is higher */
+.fb-frame.home {
+  fill: rgba(255, 255, 255, 0.06);
+  stroke: rgba(255, 243, 224, 0.45);
+  stroke-dasharray: 2 3;
+}
+
+.fb-finger.home {
+  fill: rgba(255, 243, 224, 0.45);
+}
+
+.fb-ruler line {
+  stroke: #d9c7ad;
+  stroke-width: 1.2;
+}
+
+.fb-ruler text {
+  fill: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.fb-ruler-tick.current line {
+  stroke: var(--accent-strong);
+  stroke-width: 2;
+}
+
+.fb-ruler-tick.current text {
+  fill: var(--accent-strong);
+  font-size: 10px;
+}
+
+.fb-ruler-tick.higher {
+  opacity: 0.45;
 }
 
 .fb-finger {

@@ -67,7 +67,10 @@ flagged grace note with a slur: `.vf-flag`, `.vf-stavetie`) inside
 `fingeringDisplay: 'tap'` shows them only after clicking `.score-line`;
 `'after-miss'` only on a note after a wrong or out-of-tune attempt. The
 fingerboard diagram is `svg.fingerboard` (`.fb-frame` per string in use,
-`.fb-frame.other` for the shift's other position, `.fb-current`), the cents
+`.fb-frame.other` for the shift's other position, `.fb-frame.home` for the
+1st-position reference when the current position is higher and 1st is not
+already the other position, `.fb-ruler-tick.current|lower|higher` for the
+position ruler, `.fb-current`), the cents
 strip is `.cents-cell[data-grade=ok|off|none]`, the "♪ Hear it" button plays
 a reference tone, and `settleMs` delays registration of an in-tune note.
 Stats live in `reading.noteStats` keyed `"<note>@<position>"` (bare name for
