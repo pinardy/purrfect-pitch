@@ -8,12 +8,14 @@ import {
   Annotation,
   BarlineType,
   Formatter,
+  GraceNote,
+  GraceNoteGroup,
   Renderer,
   Stave,
   StaveNote,
   Voice,
 } from 'vexflow';
-import type { SpelledNote } from './theory';
+import type { Acc, SpelledNote } from './theory';
 import { vexKey } from './theory';
 import type { Fingering } from './violin';
 
@@ -39,6 +41,7 @@ const COLORS: Record<NoteStatus, string> = {
 
 const CURSOR_FILL = 'rgba(244, 114, 166, 0.16)';
 const STRING_LABEL_COLOR = '#a78b6f';
+const GUIDE_NOTE_COLOR = '#b9a48c';
 
 const ANNOTATION_FONT = "'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Segoe UI', system-ui, sans-serif";
 
@@ -60,6 +63,10 @@ export interface RenderScoreOptions {
   width: number;
   /** per-note violin fingering to annotate; omit or leave entries null to show none */
   fingerings?: (Fingering | null)[];
+  /** index of the first note after a shift; marked with a dash before its finger */
+  shiftAt?: number | null;
+  /** guide note drawn as a small grey grace note before the shift note */
+  guideNote?: { note: SpelledNote; accidental: Acc | null } | null;
 }
 
 /** Draws the pinned clef + key signature header; returns its width. */
@@ -98,11 +105,11 @@ function addFingering(
   fingering: Fingering,
   previous: Fingering | null | undefined,
   color: string,
+  isShift: boolean,
 ): void {
-  sn.addModifier(
-    annotation(String(fingering.finger), color, 13, Annotation.VerticalJustify.TOP),
-    0,
-  );
+  // editions mark a shift with a dash leading into the new finger: "–3"
+  const label = (isShift ? '–' : '') + String(fingering.finger);
+  sn.addModifier(annotation(label, color, 13, Annotation.VerticalJustify.TOP), 0);
   if (!previous || previous.string.name !== fingering.string.name) {
     sn.addModifier(
       annotation(fingering.string.numeral, STRING_LABEL_COLOR, 11, Annotation.VerticalJustify.BOTTOM),
@@ -142,13 +149,28 @@ export function renderScore(
   stave.setBegBarType(BarlineType.NONE); // staff lines continue from the header
   stave.setContext(ctx).draw();
 
+  const shiftAt = o.shiftAt ?? null;
   const staveNotes = o.notes.map((n, i) => {
     // autoStem: stems point down for notes on or above the middle line
     const sn = new StaveNote({ keys: [vexKey(n)], duration: 'q', autoStem: true });
     const color = COLORS[o.statuses[i] ?? 'pending'];
     sn.setStyle({ fillStyle: color, strokeStyle: color });
+    const isShift = i === shiftAt;
     const fingering = fingerings?.[i];
-    if (fingering) addFingering(sn, fingering, fingerings?.[i - 1], color);
+    if (fingering) {
+      addFingering(sn, fingering, fingerings?.[i - 1], color, isShift);
+    } else if (isShift) {
+      // fingerings hidden: still say where the hand moves
+      sn.addModifier(annotation('shift', STRING_LABEL_COLOR, 10, Annotation.VerticalJustify.TOP), 0);
+    }
+    if (isShift && o.guideNote) {
+      const guide = new GraceNote({ keys: [vexKey(o.guideNote.note)], duration: '8', slash: false });
+      guide.setStyle({ fillStyle: GUIDE_NOTE_COLOR, strokeStyle: GUIDE_NOTE_COLOR });
+      if (o.guideNote.accidental !== null) {
+        guide.addModifier(new Accidental(o.guideNote.accidental || 'n'), 0);
+      }
+      sn.addModifier(new GraceNoteGroup([guide], true), 0);
+    }
     return sn;
   });
 

@@ -56,11 +56,23 @@ real sources (bundle a tiny script with `node_modules/.bin/esbuild x.ts
 `generateLine` with `DEFAULT_READING_SETTINGS`). Seed 0 + defaults ⇒
 G major: D4 E4 G4 A4 B4 F♯4 G4 A4.
 
-With a violin position set (`position: 1..7` in `reading.settings`), the
-range comes from `exerciseRange` in `src/reading/settings.ts` instead of the
-preset; fingerings render as VexFlow `Annotation` text (finger above, string
-numeral below) inside `.score-canvas`, and the staff SVG grows from 170 to
-198 px tall. Use a sine test tone for notes above ~A5: a sawtooth confuses the
+With a violin position set (`position: 1..7 | 'odd' | 'all'` in
+`reading.settings`), lines come from `planLine` in `src/reading/lineplan.ts`
+(seed 0 + fixed D major + medium + position 3 ⇒ G4 E4 A4 D5 C♯5 F♯4 F♯5 A5;
+with `shifting: true` ⇒ A3 C♯4 F♯4 | C♯5 E5 F♯4 A4 D5, shifting at index 3).
+Fingerings render as VexFlow `Annotation` text (finger above, string numeral
+below; a `–` before the finger marks the shift note, whose guide note is a
+flagged grace note with a slur: `.vf-flag`, `.vf-stavetie`) inside
+`.score-canvas`, and the staff SVG grows from 170 to 198 px tall.
+`fingeringDisplay: 'tap'` shows them only after clicking `.score-line`;
+`'after-miss'` only on a note after a wrong or out-of-tune attempt. The
+fingerboard diagram is `svg.fingerboard` (`.fb-frame` per string in use,
+`.fb-frame.other` for the shift's other position, `.fb-current`), the cents
+strip is `.cents-cell[data-grade=ok|off|none]`, the "♪ Hear it" button plays
+a reference tone, and `settleMs` delays registration of an in-tune note.
+Stats live in `reading.noteStats` keyed `"<note>@<position>"` (bare name for
+free lines) and daily history in `reading.history`; the history panel is
+`details.session-history`, and both panels only render once they have data. Use a sine test tone for notes above ~A5: a sawtooth confuses the
 autocorrelator into octave errors that a real violin does not.
 
 ## Observing sight-reading state

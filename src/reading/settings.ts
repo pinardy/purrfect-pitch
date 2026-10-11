@@ -3,10 +3,18 @@
 import type { Key, KeyMode } from './theory';
 import { MAJOR_TONICS, MINOR_TONICS } from './theory';
 import { pick } from './generator';
-import type { Position, ViolinString } from './violin';
-import { positionRange, VIOLIN_STRINGS } from './violin';
+import type { Position, StringName, ViolinString } from './violin';
+import { POSITIONS, positionRange, VIOLIN_STRINGS } from './violin';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
+
+/** a fixed position, a random one per line ('odd' = 1st/3rd/5th/7th), or free range */
+export type PositionSetting = Position | 'odd' | 'all' | null;
+
+export type FingeringDisplay = 'off' | 'always' | 'tap' | 'after-miss';
+
+/** 'auto' = strings chosen by difficulty; otherwise drill a single string */
+export type StringFocus = 'auto' | StringName;
 
 export interface ReadingSettings {
   difficulty: Difficulty;
@@ -17,9 +25,22 @@ export interface ReadingSettings {
   intonationTolerance: number | null;
   noteCount: number;
   /** violin left-hand position to stay within; null = free range from the difficulty preset */
-  position: Position | null;
-  /** annotate notes with finger numbers and strings (only applies when a position is set) */
-  showFingerings: boolean;
+  position: PositionSetting;
+  /** start each line in another position and shift into the target partway */
+  shifting: boolean;
+  /** show the guide note (old finger sliding into the new position) at each shift */
+  showGuideNotes: boolean;
+  /** when finger numbers and strings are annotated (positions only) */
+  fingeringDisplay: FingeringDisplay;
+  /** finger open strings as 0 instead of with the 4th finger */
+  useOpenStrings: boolean;
+  stringFocus: StringFocus;
+  /** weight the random notes toward ones you misread, play out of tune, or rarely see */
+  focusWeakNotes: boolean;
+  /** fingerboard diagram of the current hand frame under the staff (positions only) */
+  showFingerboard: boolean;
+  /** how long a note must stay in tune before it registers */
+  settleMs: number;
 }
 
 export interface DifficultyPreset {
@@ -68,6 +89,7 @@ export const PRESETS: Record<Difficulty, DifficultyPreset> = {
 };
 
 export const INTONATION_TOLERANCES = [10, 20, 30];
+export const SETTLE_TIMES = [0, 300, 600];
 
 export const DEFAULT_READING_SETTINGS: ReadingSettings = {
   difficulty: 'easy',
@@ -76,17 +98,42 @@ export const DEFAULT_READING_SETTINGS: ReadingSettings = {
   intonationTolerance: 20,
   noteCount: 8,
   position: null,
-  showFingerings: true,
+  shifting: false,
+  showGuideNotes: true,
+  fingeringDisplay: 'always',
+  useOpenStrings: false,
+  stringFocus: 'auto',
+  focusWeakNotes: false,
+  showFingerboard: true,
+  settleMs: 0,
 };
 
+/** Pick the concrete position for one line. */
+export function resolvePosition(setting: PositionSetting, rng: () => number): Position | null {
+  if (setting === 'odd') return pick(rng, POSITIONS.filter((p) => p % 2 === 1));
+  if (setting === 'all') return pick(rng, POSITIONS);
+  return setting;
+}
+
+/** Strings a positioned line may use: a single drilled string, or the difficulty's set. */
+export function positionStrings(settings: ReadingSettings): ViolinString[] {
+  if (settings.stringFocus !== 'auto') {
+    return VIOLIN_STRINGS.filter((s) => s.name === settings.stringFocus);
+  }
+  return PRESETS[settings.difficulty].positionStrings;
+}
+
 /**
- * MIDI range for a new line: the hand frame of the chosen position on the
- * difficulty's strings, or the preset's free range when no position is set.
+ * MIDI range for a line (or line segment): the hand frame of `position` on the
+ * chosen strings, or the preset's free range when no position is set.
  */
-export function exerciseRange(settings: ReadingSettings, key: Key): [number, number] {
-  const preset = PRESETS[settings.difficulty];
-  if (settings.position === null) return preset.range;
-  return positionRange(settings.position, preset.positionStrings, key);
+export function exerciseRange(
+  settings: ReadingSettings,
+  key: Key,
+  position: Position | null,
+): [number, number] {
+  if (position === null) return PRESETS[settings.difficulty].range;
+  return positionRange(position, positionStrings(settings), key);
 }
 
 export function randomKey(settings: ReadingSettings, rng: () => number): Key {
@@ -105,11 +152,18 @@ export function loadReadingSettings(): ReadingSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_READING_SETTINGS;
-    const stored = JSON.parse(raw) as Partial<ReadingSettings> & { strictIntonation?: boolean };
+    const stored = JSON.parse(raw) as Partial<ReadingSettings> & {
+      strictIntonation?: boolean;
+      showFingerings?: boolean;
+    };
     // migrate the former on/off "strict intonation" switch (±30¢ when on)
-    const { strictIntonation, ...rest } = stored;
+    const { strictIntonation, showFingerings, ...rest } = stored;
     if (strictIntonation !== undefined && rest.intonationTolerance === undefined) {
       rest.intonationTolerance = strictIntonation ? 30 : DEFAULT_READING_SETTINGS.intonationTolerance;
+    }
+    // ...and the former "show fingerings" checkbox
+    if (showFingerings !== undefined && rest.fingeringDisplay === undefined) {
+      rest.fingeringDisplay = showFingerings ? 'always' : 'off';
     }
     return { ...DEFAULT_READING_SETTINGS, ...rest };
   } catch {

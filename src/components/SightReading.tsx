@@ -1,16 +1,22 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { autoCorrelate } from '../audio/pitch';
+import { playReferenceTone } from '../audio/tone';
 import { useWakeLock } from '../hooks/useWakeLock';
 import CatFace, { type CatMood } from './CatFace';
+import CentsStrip from './CentsStrip';
+import Fingerboard from './Fingerboard';
 import ScoreView from './ScoreView';
 import NoteAccuracy from './NoteAccuracy';
 import ReadingSettings from './ReadingSettings';
+import SessionHistory from './SessionHistory';
 import { clampA4, DEFAULT_A4 } from './TunerSettings';
 import { NoteMatcher, toPitchFrame } from '../reading/matcher';
 import { exerciseReducer, INITIAL_LINE_STATE, lineScore } from '../reading/exercise';
-import { generateLine, mulberry32 } from '../reading/generator';
-import { keyLabel, midiToName, vexKeySignature } from '../reading/theory';
-import { fingeringFor, positionLabel } from '../reading/violin';
+import { mulberry32 } from '../reading/generator';
+import { dayOf, loadHistory, saveHistory, withLineResult, type History } from '../reading/history';
+import { planLine, shiftOrigin } from '../reading/lineplan';
+import { keyAlterations, keyLabel, midiToName, vexKeySignature } from '../reading/theory';
+import { fingeringFor, guideNote, positionLabel, positionOrdinal } from '../reading/violin';
 import {
   loadNoteStats,
   saveNoteStats,
@@ -18,10 +24,8 @@ import {
   type NoteStats,
 } from '../reading/noteStats';
 import {
-  exerciseRange,
   loadReadingSettings,
-  PRESETS,
-  randomKey,
+  positionStrings,
   saveReadingSettings,
   type ReadingSettings as Settings,
 } from '../reading/settings';
@@ -54,6 +58,7 @@ export default function SightReading() {
   const [showSettings, setShowSettings] = useState(false);
   const [stats, setStats] = useState<SessionStats>({ lines: 0, notes: 0, firstTry: 0, inTune: 0 });
   const [noteStats, setNoteStats] = useState<NoteStats>(loadNoteStats);
+  const [history, setHistory] = useState<History>(loadHistory);
   const [heard, setHeard] = useState<{ midi: number; cents: number } | null>(null);
   const [wrongFlash, setWrongFlash] = useState(false);
   const [happyFlash, setHappyFlash] = useState(false);
@@ -68,18 +73,23 @@ export default function SightReading() {
   const matcherRef = useRef(new NoteMatcher());
   const lineRef = useRef(line);
   lineRef.current = line;
+  const noteStatsRef = useRef(noteStats);
+  noteStatsRef.current = noteStats;
   const wrongTimer = useRef(0);
   const happyTimer = useRef(0);
   const lastHeardUpdate = useRef(0);
 
-  // apply the intonation tolerance without losing the current target
+  // apply the intonation tolerance and settle time without losing the current target
   useEffect(() => {
-    matcherRef.current = new NoteMatcher({ maxCentsOff: settings.intonationTolerance });
+    matcherRef.current = new NoteMatcher({
+      maxCentsOff: settings.intonationTolerance,
+      minInTuneMs: settings.settleMs,
+    });
     const current = lineRef.current;
     matcherRef.current.setTarget(
       current.phase === 'playing' ? current.notes[current.cursor]?.midi ?? null : null,
     );
-  }, [settings.intonationTolerance]);
+  }, [settings.intonationTolerance, settings.settleMs]);
 
   const updateSettings = useCallback((next: Settings) => {
     setSettings(next);
@@ -88,20 +98,11 @@ export default function SightReading() {
 
   const newLine = useCallback(() => {
     const rng = mulberry32(Math.floor(Math.random() * 0xffffffff));
-    const key = randomKey(settings, rng);
-    const preset = PRESETS[settings.difficulty];
-    const notes = generateLine({
-      key,
-      range: exerciseRange(settings, key),
-      maxLeap: preset.maxLeap,
-      chromaticProb: preset.chromaticProb,
-      noteCount: settings.noteCount,
-      rng,
-    });
+    const plan = planLine(settings, noteStatsRef.current, rng);
     matcherRef.current.reset();
-    matcherRef.current.setTarget(notes[0].midi);
+    matcherRef.current.setTarget(plan.notes[0].midi);
     setWrongFlash(false);
-    dispatch({ type: 'NEW_LINE', key, position: settings.position, notes });
+    dispatch({ type: 'NEW_LINE', ...plan });
   }, [settings]);
 
   function stop() {
@@ -161,10 +162,10 @@ export default function SightReading() {
         for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
         rms = Math.sqrt(rms / buf.length);
 
-        const hz = autoCorrelate(buf, ctx.sampleRate);
-        const frame = hz > 0 ? toPitchFrame(hz, rms, a4) : null;
-
         const now = performance.now();
+        const hz = autoCorrelate(buf, ctx.sampleRate);
+        const frame = hz > 0 ? toPitchFrame(hz, rms, a4, now) : null;
+
         if (now - lastHeardUpdate.current >= HEARD_UPDATE_MS) {
           lastHeardUpdate.current = now;
           setHeard(frame ? { midi: frame.midi, cents: Math.round(frame.cents) } : null);
@@ -175,17 +176,19 @@ export default function SightReading() {
           if (event.type === 'correct') {
             const current = lineRef.current;
             const i = current.cursor;
+            const wasOff = current.outOfTuneCounts[i] > 0;
             setNoteStats((s) =>
-              withNoteResult(s, current.notes[i], {
+              withNoteResult(s, current.notes[i], current.positions[i], {
                 missed: current.wrongCounts[i] > 0,
-                outOfTuneCents: current.outOfTuneCounts[i] > 0 ? current.outOfTuneCents[i] : null,
+                outOfTuneCents: wasOff ? current.outOfTuneCents[i] : null,
+                cents: wasOff ? current.outOfTuneCents[i] : event.cents,
               }),
             );
             const nextCursor = current.cursor + 1;
             matcherRef.current.setTarget(
               nextCursor < current.notes.length ? current.notes[nextCursor].midi : null,
             );
-            dispatch({ type: 'NOTE_CORRECT' });
+            dispatch({ type: 'NOTE_CORRECT', cents: event.cents });
             setHappyFlash(true);
             window.clearTimeout(happyTimer.current);
             happyTimer.current = window.setTimeout(() => setHappyFlash(false), HAPPY_FLASH_MS);
@@ -216,16 +219,22 @@ export default function SightReading() {
     saveNoteStats(noteStats);
   }, [noteStats]);
 
+  useEffect(() => {
+    saveHistory(history);
+  }, [history]);
+
   // record stats + auto-advance when a line completes
   useEffect(() => {
     if (line.phase !== 'summary') return;
-    const score = lineScore(lineRef.current);
+    const finished = lineRef.current;
+    const score = lineScore(finished);
     setStats((s) => ({
       lines: s.lines + 1,
       notes: s.notes + score.total,
       firstTry: s.firstTry + score.firstTry,
       inTune: s.inTune + score.inTune,
     }));
+    setHistory((h) => withLineResult(h, dayOf(new Date()), finished.position, score));
     const timer = window.setTimeout(() => newLine(), AUTO_NEXT_MS);
     return () => window.clearTimeout(timer);
     // newLine is stable for the lifetime of a given summary phase
@@ -237,15 +246,52 @@ export default function SightReading() {
       ? line.statuses.map((s, i) => (i === line.cursor ? ('wrongFlash' as const) : s))
       : line.statuses;
 
-  // fingerings follow the position the line was generated for, not the settings
+  // fingerings follow the position each note was generated in, not the settings
   const position = line.position;
-  const fingerings = useMemo(
+  const allFingerings = useMemo(
     () =>
-      position !== null && settings.showFingerings
-        ? line.notes.map((n) => fingeringFor(n, position))
-        : undefined,
-    [line.notes, position, settings.showFingerings],
+      position !== null
+        ? line.notes.map((n, i) => {
+            const p = line.positions[i];
+            return p === null ? null : fingeringFor(n, p, settings.useOpenStrings);
+          })
+        : null,
+    [line.notes, line.positions, position, settings.useOpenStrings],
   );
+  const fingeringsVisible = (i: number): boolean => {
+    switch (settings.fingeringDisplay) {
+      case 'off':
+        return false;
+      case 'always':
+        return true;
+      case 'tap':
+        return line.revealAll;
+      case 'after-miss':
+        return line.revealAll || line.revealed[i];
+    }
+  };
+  const fingerings = useMemo(
+    () => allFingerings?.map((f, i) => (f && fingeringsVisible(i) ? f : null)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allFingerings, settings.fingeringDisplay, line.revealAll, line.revealed],
+  );
+  const shiftTarget = line.shiftAt !== null ? line.positions[line.shiftAt] : null;
+  const guide = useMemo(() => {
+    if (!settings.showGuideNotes || line.shiftAt === null || !allFingerings) return null;
+    const from = allFingerings[line.shiftAt - 1];
+    const to = line.positions[line.shiftAt];
+    if (!from || to === null) return null;
+    const note = guideNote(from, to, line.key);
+    if (!note) return null;
+    const expected = keyAlterations(line.key)[note.letter] ?? '';
+    return { note, accidental: note.acc === expected ? null : note.acc };
+  }, [settings.showGuideNotes, line.shiftAt, line.positions, line.key, allFingerings]);
+
+  const currentPosition = line.phase === 'playing' ? line.positions[line.cursor] ?? null : position;
+  const currentFingering = line.phase === 'playing' ? allFingerings?.[line.cursor] ?? null : null;
+  const canTapForFingerings =
+    position !== null &&
+    (settings.fingeringDisplay === 'tap' || settings.fingeringDisplay === 'after-miss');
 
   const score = lineScore(line);
   const accuracy = stats.notes > 0 ? Math.round((stats.firstTry / stats.notes) * 100) : null;
@@ -258,6 +304,13 @@ export default function SightReading() {
       ? ' · too sharp, ease down'
       : ' · too flat, push up'
     : '';
+  const positionText =
+    position === null
+      ? null
+      : line.shiftAt !== null && shiftTarget !== null
+        ? `${positionOrdinal(shiftOrigin(shiftTarget))} → ${positionLabel(shiftTarget)}`
+        : positionLabel(position);
+
   const mood: CatMood = !listening
     ? 'sleepy'
     : wrongFlash
@@ -265,6 +318,11 @@ export default function SightReading() {
       : happyFlash || line.phase === 'summary'
         ? 'happy'
         : 'neutral';
+
+  const hearNote = () => {
+    const target = line.notes[line.cursor];
+    if (target) void playReferenceTone(target.midi, loadA4());
+  };
 
   return (
     <div className="card reading">
@@ -289,9 +347,7 @@ export default function SightReading() {
         {line.phase !== 'idle' ? (
           <span className="reading-key">
             {keyLabel(line.key)}
-            {position !== null && (
-              <span className="reading-position"> · {positionLabel(position)}</span>
-            )}
+            {positionText && <span className="reading-position"> · {positionText}</span>}
           </span>
         ) : (
           <span className="reading-key">&nbsp;</span>
@@ -313,8 +369,20 @@ export default function SightReading() {
             </p>
             {settings.position !== null && (
               <p className="hint">
-                Lines stay within {positionLabel(settings.position)} on the violin
-                {settings.showFingerings ? ', with fingerings shown above each note' : ''}.
+                {settings.position === 'odd'
+                  ? 'Each line picks an odd-numbered position'
+                  : settings.position === 'all'
+                    ? 'Each line picks a position from 1st to 7th'
+                    : `Lines stay within ${positionLabel(settings.position)}`}
+                {settings.shifting ? ', shifting into it partway' : ''}
+                {settings.fingeringDisplay === 'always'
+                  ? ', with fingerings shown above each note'
+                  : settings.fingeringDisplay === 'tap'
+                    ? '; tap the staff to reveal fingerings'
+                    : settings.fingeringDisplay === 'after-miss'
+                      ? '; fingerings appear after a slip'
+                      : ''}
+                .
               </p>
             )}
             <p className="hint">Start the microphone to begin.</p>
@@ -325,7 +393,10 @@ export default function SightReading() {
             statuses={displayStatuses}
             cursor={line.cursor}
             keySignature={vexKeySignature(line.key)}
-            fingerings={fingerings}
+            fingerings={fingerings ?? undefined}
+            shiftAt={line.shiftAt}
+            guideNote={guide}
+            onTap={canTapForFingerings ? () => dispatch({ type: 'TOGGLE_REVEAL' }) : undefined}
           />
         )}
 
@@ -343,12 +414,38 @@ export default function SightReading() {
         )}
       </div>
 
+      {line.phase !== 'idle' && checkingIntonation && (
+        <CentsStrip cents={line.cents} tolerance={settings.intonationTolerance} />
+      )}
+
+      {line.phase !== 'idle' && settings.showFingerboard && currentPosition !== null && (
+        <Fingerboard
+          key_={line.key}
+          position={currentPosition}
+          otherPosition={
+            line.shiftAt !== null && shiftTarget !== null
+              ? currentPosition === shiftTarget
+                ? shiftOrigin(shiftTarget)
+                : shiftTarget
+              : null
+          }
+          strings={positionStrings(settings)}
+          current={
+            currentFingering && line.phase === 'playing'
+              ? { note: line.notes[line.cursor], string: currentFingering.string }
+              : null
+          }
+        />
+      )}
+
       <div className="readout">
         <span className={'freq-readout' + (holdingOutOfTune ? ' out-of-tune' : '')}>
           {heard
             ? `Hearing ${midiToName(heard.midi)} · ${heard.cents > 0 ? '+' : ''}${heard.cents}¢${tuningHint}`
             : listening
-              ? 'Play the highlighted note…'
+              ? canTapForFingerings && !line.revealAll
+                ? 'Play the highlighted note… (tap the staff for fingerings)'
+                : 'Play the highlighted note…'
               : 'Tap start and play the highlighted note'}
         </span>
       </div>
@@ -359,6 +456,11 @@ export default function SightReading() {
         <button className={'primary-btn' + (listening ? ' stop' : '')} onClick={listening ? stop : start}>
           {listening ? 'Stop' : 'Start reading'}
         </button>
+        {listening && line.phase === 'playing' && (
+          <button className="secondary-btn" onClick={hearNote} aria-label="Hear the target note">
+            ♪ Hear it
+          </button>
+        )}
         {listening && line.phase !== 'idle' && (
           <button className="secondary-btn" onClick={newLine}>
             New line
@@ -367,6 +469,7 @@ export default function SightReading() {
       </div>
 
       <NoteAccuracy stats={noteStats} onReset={() => setNoteStats({})} />
+      <SessionHistory history={history} />
 
       {showSettings && (
         <ReadingSettings

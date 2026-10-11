@@ -20,6 +20,19 @@ export function pick<T>(rng: () => number, items: T[]): T {
   return items[Math.floor(rng() * items.length)];
 }
 
+/** Weighted random choice; non-positive weights never win unless all are. */
+export function pickWeighted<T>(rng: () => number, items: T[], weight: (item: T) => number): T {
+  const weights = items.map((item) => Math.max(0, weight(item)));
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  if (total <= 0) return pick(rng, items);
+  let r = rng() * total;
+  for (let i = 0; i < items.length; i++) {
+    r -= weights[i];
+    if (r < 0) return items[i];
+  }
+  return items[items.length - 1];
+}
+
 export interface GeneratorOptions {
   key: Key;
   /** inclusive MIDI range */
@@ -30,6 +43,10 @@ export interface GeneratorOptions {
   chromaticProb: number;
   noteCount: number;
   rng: () => number;
+  /** note played just before this line segment, so the first note keeps within maxLeap of it */
+  prev?: SpelledNote;
+  /** relative likelihood of each candidate note; defaults to uniform */
+  weight?: (note: SpelledNote) => number;
 }
 
 const LETTERS: Letter[] = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
@@ -73,12 +90,13 @@ export function generateLine(o: GeneratorOptions): SpelledNote[] {
   const pool = diatonicNotesInRange(o.key, o.range);
   if (pool.length < 2) throw new Error('Range too narrow to generate an exercise');
   const line: SpelledNote[] = [];
+  const weight = o.weight ?? (() => 1);
   for (let i = 0; i < o.noteCount; i++) {
-    const prev = line[i - 1];
+    const prev = i === 0 ? o.prev : line[i - 1];
     const candidates = prev
       ? pool.filter((n) => n.midi !== prev.midi && Math.abs(n.midi - prev.midi) <= o.maxLeap)
       : pool;
-    let note = pick(o.rng, candidates.length > 0 ? candidates : pool);
+    let note = pickWeighted(o.rng, candidates.length > 0 ? candidates : pool, weight);
     if (o.rng() < o.chromaticProb) {
       const altered = chromaticAlter(note, o.key, o.range);
       // never allow a chromatic alteration to collide with the previous pitch

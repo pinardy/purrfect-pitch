@@ -10,12 +10,14 @@ export interface PitchFrame {
   midi: number;
   /** cents offset from that nearest note, -50..+50 */
   cents: number;
+  /** capture time in ms (performance.now()); needed for the settle time */
+  t?: number;
 }
 
-export function toPitchFrame(hz: number, rms: number, a4: number): PitchFrame {
+export function toPitchFrame(hz: number, rms: number, a4: number, t?: number): PitchFrame {
   const midiFloat = freqToMidiFloat(hz, a4);
   const midi = Math.round(midiFloat);
-  return { hz, rms, midi, cents: (midiFloat - midi) * 100 };
+  return { hz, rms, midi, cents: (midiFloat - midi) * 100, t };
 }
 
 export interface MatcherConfig {
@@ -33,6 +35,8 @@ export interface MatcherConfig {
    * target pitch outside it reports `outOfTune`. null disables the check.
    */
   maxCentsOff: number | null;
+  /** how long the target must stay in tune (ms of frame time) before it registers */
+  minInTuneMs: number;
 }
 
 export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
@@ -43,6 +47,7 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
   // 7th position on the E string reaches A6 (1760 Hz); leave room for sharp keys
   maxHz: 2200,
   maxCentsOff: null,
+  minInTuneMs: 0,
 };
 
 export type MatcherEvent =
@@ -75,6 +80,8 @@ export class NoteMatcher {
   /** cents of the most recent stable frames, for a vibrato-tolerant average */
   private centsWindow: number[] = [];
   private outOfTuneEmitted = false;
+  /** frame time when the target first came within tolerance during this hold */
+  private inTuneSince: number | null = null;
 
   constructor(config: Partial<MatcherConfig> = {}) {
     this.config = { ...DEFAULT_MATCHER_CONFIG, ...config };
@@ -93,6 +100,7 @@ export class NoteMatcher {
     this.wrongEmittedFor.clear();
     this.centsWindow = [];
     this.outOfTuneEmitted = false;
+    this.inTuneSince = null;
   }
 
   private isVoiced(frame: PitchFrame): boolean {
@@ -114,6 +122,7 @@ export class NoteMatcher {
       this.stableCount = 0;
       this.centsWindow = [];
       this.outOfTuneEmitted = false;
+      this.inTuneSince = null;
       if (++this.silenceCount >= this.config.silenceFrames) {
         this.armed = true;
         this.wrongEmittedFor.clear();
@@ -130,6 +139,7 @@ export class NoteMatcher {
       this.stableCount = 1;
       this.centsWindow = [];
       this.outOfTuneEmitted = false;
+      this.inTuneSince = null;
     }
     this.centsWindow.push(frame.cents);
     if (this.centsWindow.length > this.config.minStableFrames) this.centsWindow.shift();
@@ -156,11 +166,18 @@ export class NoteMatcher {
     const cents = this.averageCents();
     const tolerance = this.config.maxCentsOff;
     if (tolerance === null || Math.abs(cents) <= tolerance) {
+      // settle time: the note must stay in tune, not just pass through it
+      const now = frame.t;
+      if (this.config.minInTuneMs > 0 && now !== undefined) {
+        if (this.inTuneSince === null) this.inTuneSince = now;
+        if (now - this.inTuneSince < this.config.minInTuneMs) return null;
+      }
       this.armed = false;
       this.lastAcceptedMidi = frame.midi;
       this.wrongEmittedFor.clear();
       return { type: 'correct', midi: frame.midi, cents };
     }
+    this.inTuneSince = null;
     if (!this.outOfTuneEmitted) {
       this.outOfTuneEmitted = true;
       return { type: 'outOfTune', midi: frame.midi, cents };
