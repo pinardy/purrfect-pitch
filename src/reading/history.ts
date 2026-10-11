@@ -9,6 +9,10 @@ export interface DayRecord {
   notes: number;
   firstTry: number;
   inTune: number;
+  /** shift notes played (absent in older saves) */
+  shifts?: number;
+  /** shift notes that were clean: right pitch, in tune, first time */
+  shiftsClean?: number;
 }
 
 /** position key: 'free' or '1'..'7' */
@@ -67,6 +71,8 @@ export function withLineResult(
         notes: prev.notes + score.total,
         firstTry: prev.firstTry + score.firstTry,
         inTune: prev.inTune + score.inTune,
+        shifts: (prev.shifts ?? 0) + score.shifts,
+        shiftsClean: (prev.shiftsClean ?? 0) + score.shiftsClean,
       },
     },
   };
@@ -94,8 +100,10 @@ export function dailyTotals(history: History, filter: PositionKey | 'all'): DayT
           notes: acc.notes + r.notes,
           firstTry: acc.firstTry + r.firstTry,
           inTune: acc.inTune + r.inTune,
+          shifts: (acc.shifts ?? 0) + (r.shifts ?? 0),
+          shiftsClean: (acc.shiftsClean ?? 0) + (r.shiftsClean ?? 0),
         }),
-        { day, lines: 0, notes: 0, firstTry: 0, inTune: 0 },
+        { day, lines: 0, notes: 0, firstTry: 0, inTune: 0, shifts: 0, shiftsClean: 0 },
       );
     })
     .filter((t) => t.lines > 0);

@@ -35,6 +35,16 @@ export function statKey(note: SpelledNote, position: Position | null): string {
   return position === null ? name : `${name}@${position}`;
 }
 
+/** Key for per-finger stats, e.g. "4@3" = 4th finger in 3rd position. */
+export function fingerKey(finger: number, position: Position): string {
+  return `${finger}@${position}`;
+}
+
+export function parseFingerKey(key: string): { finger: number; position: Position } {
+  const [finger, position] = key.split('@').map(Number);
+  return { finger, position: position as Position };
+}
+
 export function parseStatKey(key: string): { name: string; position: Position | null } {
   const [name, pos] = key.split('@');
   return { name, position: pos ? (Number(pos) as Position) : null };
@@ -61,14 +71,8 @@ export function saveNoteStats(stats: NoteStats): void {
   }
 }
 
-/** Returns a new map with one played note recorded. */
-export function withNoteResult(
-  stats: NoteStats,
-  note: SpelledNote,
-  position: Position | null,
-  result: NoteResult,
-): NoteStats {
-  const key = statKey(note, position);
+/** Returns a new map with one result recorded under `key`. */
+export function withResult(stats: NoteStats, key: string, result: NoteResult): NoteStats {
   const prev = stats[key] ?? { attempts: 0, misses: 0 };
   const off = result.outOfTuneCents;
   return {
@@ -82,6 +86,35 @@ export function withNoteResult(
       centsSum: (prev.centsSum ?? 0) + result.cents,
     },
   };
+}
+
+/** Returns a new map with one played note recorded. */
+export function withNoteResult(
+  stats: NoteStats,
+  note: SpelledNote,
+  position: Position | null,
+  result: NoteResult,
+): NoteStats {
+  return withResult(stats, statKey(note, position), result);
+}
+
+const FINGER_STORAGE_KEY = 'reading.fingerStats';
+
+export function loadFingerStats(): NoteStats {
+  try {
+    const raw = localStorage.getItem(FINGER_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as NoteStats) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveFingerStats(stats: NoteStats): void {
+  try {
+    localStorage.setItem(FINGER_STORAGE_KEY, JSON.stringify(stats));
+  } catch {
+    // storage unavailable — stats just won't persist
+  }
 }
 
 /** Average first-heard cents offset; 0 for older records without it. */

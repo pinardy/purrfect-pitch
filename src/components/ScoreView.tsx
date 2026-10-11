@@ -3,7 +3,7 @@ import type { SpelledNote } from '../reading/theory';
 import type { NoteStatus } from '../reading/renderScore';
 import { renderScore } from '../reading/renderScore';
 import type { Fingering } from '../reading/violin';
-import type { RenderScoreOptions } from '../reading/renderScore';
+import type { GuideNote } from '../reading/renderScore';
 
 interface Props {
   notes: SpelledNote[];
@@ -11,8 +11,8 @@ interface Props {
   cursor: number;
   keySignature: string;
   fingerings?: (Fingering | null)[];
-  shiftAt?: number | null;
-  guideNote?: RenderScoreOptions['guideNote'];
+  shifts?: number[];
+  guideNotes?: (GuideNote | null)[];
   onTap?: () => void;
 }
 
@@ -22,8 +22,8 @@ export default function ScoreView({
   cursor,
   keySignature,
   fingerings,
-  shiftAt,
-  guideNote,
+  shifts,
+  guideNotes,
   onTap,
 }: Props) {
   const headerRef = useRef<HTMLDivElement>(null);
@@ -52,14 +52,14 @@ export default function ScoreView({
       keySignature,
       width,
       fingerings,
-      shiftAt,
-      guideNote,
+      shifts,
+      guideNotes,
     });
     // when the line is wider than the viewport, keep the current note centered
     if (cursorX !== null && notesEl.scrollWidth > notesEl.clientWidth) {
       notesEl.scrollTo({ left: cursorX - notesEl.clientWidth / 2, behavior: 'smooth' });
     }
-  }, [notes, statuses, cursor, keySignature, fingerings, shiftAt, guideNote, width]);
+  }, [notes, statuses, cursor, keySignature, fingerings, shifts, guideNotes, width]);
 
   return (
     <div ref={wrapRef} className="score-line" onClick={onTap}>

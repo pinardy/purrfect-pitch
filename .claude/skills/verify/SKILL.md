@@ -71,8 +71,18 @@ fingerboard diagram is `svg.fingerboard` (`.fb-frame` per string in use,
 strip is `.cents-cell[data-grade=ok|off|none]`, the "♪ Hear it" button plays
 a reference tone, and `settleMs` delays registration of an in-tune note.
 Stats live in `reading.noteStats` keyed `"<note>@<position>"` (bare name for
-free lines) and daily history in `reading.history`; the history panel is
-`details.session-history`, and both panels only render once they have data. Use a sine test tone for notes above ~A5: a sawtooth confuses the
+free lines), per-finger stats in `reading.fingerStats` keyed
+`"<finger>@<position>"`, and daily history in `reading.history`; the history
+panel is `details.session-history`, and both panels only render once they
+have data. Shifting lines carry `shifts: number[]` (indices of the notes
+after each shift; `shiftsPerLine` 1–3, `shiftOrigin` a position or 'auto');
+with 2 shifts the line starts in the target. `pauseAfterLine: true` keeps the
+summary up until `.score-summary` or "Next line" is tapped. "Export CSV"
+clicks a hidden anchor (stub `HTMLAnchorElement.prototype.click` to capture
+the filename). The settings sheet is `details.settings-section` groups under
+a preset chip row. At ≥700 px wide in landscape `.card.reading` becomes a
+two-column grid with the fingerboard and cat on the right. Set the tab by
+clicking the "Sight Read" button, not via localStorage. Use a sine test tone for notes above ~A5: a sawtooth confuses the
 autocorrelator into octave errors that a real violin does not.
 
 ## Observing sight-reading state

@@ -16,6 +16,9 @@ export type FingeringDisplay = 'off' | 'always' | 'tap' | 'after-miss';
 /** 'auto' = strings chosen by difficulty; otherwise drill a single string */
 export type StringFocus = 'auto' | StringName;
 
+/** feedback when a note registers */
+export type CueMode = 'off' | 'haptic' | 'sound' | 'both';
+
 export interface ReadingSettings {
   difficulty: Difficulty;
   /** 'random-major' | 'random-any' | fixed key */
@@ -28,6 +31,10 @@ export interface ReadingSettings {
   position: PositionSetting;
   /** start each line in another position and shift into the target partway */
   shifting: boolean;
+  /** position a shifting line starts in; 'auto' = 1st (3rd when the target is 1st) */
+  shiftOrigin: Position | 'auto';
+  /** shifts per line (1–3); the line alternates between origin and target */
+  shiftsPerLine: number;
   /** show the guide note (old finger sliding into the new position) at each shift */
   showGuideNotes: boolean;
   /** when finger numbers and strings are annotated (positions only) */
@@ -41,6 +48,9 @@ export interface ReadingSettings {
   showFingerboard: boolean;
   /** how long a note must stay in tune before it registers */
   settleMs: number;
+  /** keep the finished line on screen until "Next line" is tapped */
+  pauseAfterLine: boolean;
+  cue: CueMode;
 }
 
 export interface DifficultyPreset {
@@ -99,6 +109,8 @@ export const DEFAULT_READING_SETTINGS: ReadingSettings = {
   noteCount: 8,
   position: null,
   shifting: false,
+  shiftOrigin: 'auto',
+  shiftsPerLine: 1,
   showGuideNotes: true,
   fingeringDisplay: 'always',
   useOpenStrings: false,
@@ -106,7 +118,89 @@ export const DEFAULT_READING_SETTINGS: ReadingSettings = {
   focusWeakNotes: false,
   showFingerboard: true,
   settleMs: 0,
+  pauseAfterLine: false,
+  cue: 'off',
 };
+
+export const MAX_SHIFTS_PER_LINE = 3;
+
+/** The position a shifting line starts in before moving to `target`. */
+export function shiftOriginFor(settings: ReadingSettings, target: Position): Position {
+  if (settings.shiftOrigin !== 'auto' && settings.shiftOrigin !== target) return settings.shiftOrigin;
+  return target === 1 ? 3 : 1;
+}
+
+export interface PracticePreset {
+  id: string;
+  label: string;
+  hint: string;
+  apply: Partial<ReadingSettings>;
+}
+
+/** One-tap bundles of settings for common practice goals. */
+export const PRACTICE_PRESETS: PracticePreset[] = [
+  {
+    id: 'free',
+    label: 'Free reading',
+    hint: 'no position, full range by difficulty',
+    apply: { position: null, shifting: false, focusWeakNotes: false },
+  },
+  {
+    id: 'position-intro',
+    label: 'Position intro',
+    hint: '3rd position, D & A strings, fingerings shown, fingerboard on',
+    apply: {
+      difficulty: 'easy',
+      position: 3,
+      shifting: false,
+      stringFocus: 'auto',
+      fingeringDisplay: 'always',
+      showFingerboard: true,
+      intonationTolerance: 30,
+      settleMs: 0,
+    },
+  },
+  {
+    id: 'shifting',
+    label: 'Shifting drill',
+    hint: '1st ↔ 3rd position, two shifts a line, guide notes on',
+    apply: {
+      difficulty: 'medium',
+      position: 3,
+      shifting: true,
+      shiftOrigin: 1,
+      shiftsPerLine: 2,
+      showGuideNotes: true,
+      fingeringDisplay: 'always',
+      showFingerboard: true,
+      noteCount: 8,
+    },
+  },
+  {
+    id: 'intonation',
+    label: 'Intonation tightener',
+    hint: '±10¢, 0.6 s settle, fingerings only after a slip, weak notes first',
+    apply: {
+      intonationTolerance: 10,
+      settleMs: 600,
+      fingeringDisplay: 'after-miss',
+      focusWeakNotes: true,
+    },
+  },
+  {
+    id: 'test',
+    label: 'Test yourself',
+    hint: 'random odd positions, no fingerings or fingerboard, ±20¢',
+    apply: {
+      position: 'odd',
+      shifting: false,
+      fingeringDisplay: 'off',
+      showFingerboard: false,
+      intonationTolerance: 20,
+      focusWeakNotes: false,
+    },
+  },
+];
 
 /** Pick the concrete position for one line. */
 export function resolvePosition(setting: PositionSetting, rng: () => number): Position | null {

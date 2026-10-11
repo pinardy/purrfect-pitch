@@ -28,12 +28,21 @@ An installable PWA (React + TypeScript + Vite) with three tools you can toggle b
     correctly, and each line also scores how many notes were in tune. The
     all-time note stats panel has an **Intonation** view listing the notes you
     most often play out of tune, their average drift, and whether they tend
-    sharp or flat, tracked per position. A cents strip under the staff shows
-    each note of the line as a dot raised when sharp and lowered when flat,
-    **♪ Hear it** sounds the target note, and a settle time (0.3 s or 0.6 s)
-    can require a note to stay in tune before it registers.
-  - **Practice history** — day-by-day first-try and in-tune rates, filterable
-    by position, as a chart or table.
+    sharp or flat, tracked per position, plus a **Fingers** view with the same
+    per finger and position ("4th finger · 3rd: tends flat"). A cents strip
+    under the staff shows each note of the line as a dot raised when sharp and
+    lowered when flat, the line summary names the drift ("drifting sharp as
+    the line goes on"), **♪ Hear it** sounds the target note, and a settle
+    time (0.3 s or 0.6 s) can require a note to stay in tune before it
+    registers. An optional cue (blip and/or vibration) confirms each note.
+  - **Practice history** — day-by-day first-try, in-tune and shift rates,
+    filterable by position, as a chart or table; all stats export to CSV via
+    the share sheet or a download.
+  - **Flow and layout** — lines auto-advance after a moment or pause until
+    tapped; presets (Position intro, Shifting drill, Intonation tightener,
+    Test yourself) set several options at once; settings are grouped in
+    collapsible sections; and in landscape on a tablet or a phone on a stand
+    the staff sits beside the fingerboard so nothing scrolls while playing.
   - **Violin positions** — pick 1st to 7th position (or a random odd/any
     position per line) and every line stays within that hand frame, so you
     can drill reading in a position. Strings follow the difficulty (D and A
@@ -42,10 +51,12 @@ An installable PWA (React + TypeScript + Vite) with three tools you can toggle b
     shown always, only after you tap the staff, only after a slip, or never;
     open strings can be fingered 0. A fingerboard diagram under the staff
     shows the hand frame with the current note marked.
-  - **Shifting** — "Practise the shift" starts each line in 1st position
-    (3rd when the target is 1st) and shifts into the target partway. The
-    shift note gets a dash before its finger, and an optional small grey
-    guide note shows where the old finger slides to.
+  - **Shifting** — "Practise the shift" moves each line between a chosen
+    origin position (1st by default) and the target, with one to three
+    shifts a line, always ending in the target. Each shift note gets a dash
+    before its finger, an optional small grey guide note shows where the old
+    finger slides to, and shift notes are scored separately ("1/2 shifts
+    clean") on the line, in the session, and in the history.
   - **Focus on weak notes** — weights the random notes toward the ones you
     misread, play out of tune, or have rarely seen, per position.
 

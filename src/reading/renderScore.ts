@@ -63,10 +63,16 @@ export interface RenderScoreOptions {
   width: number;
   /** per-note violin fingering to annotate; omit or leave entries null to show none */
   fingerings?: (Fingering | null)[];
-  /** index of the first note after a shift; marked with a dash before its finger */
-  shiftAt?: number | null;
-  /** guide note drawn as a small grey grace note before the shift note */
-  guideNote?: { note: SpelledNote; accidental: Acc | null } | null;
+  /** indices of the first note after each shift; marked with a dash before the finger */
+  shifts?: number[];
+  /** per-note guide note drawn as a small grey grace note before a shift note */
+  guideNotes?: (GuideNote | null)[];
+}
+
+export interface GuideNote {
+  note: SpelledNote;
+  /** accidental to print, or null when the key signature already implies it */
+  accidental: Acc | null;
 }
 
 /** Draws the pinned clef + key signature header; returns its width. */
@@ -149,13 +155,13 @@ export function renderScore(
   stave.setBegBarType(BarlineType.NONE); // staff lines continue from the header
   stave.setContext(ctx).draw();
 
-  const shiftAt = o.shiftAt ?? null;
+  const shifts = new Set(o.shifts ?? []);
   const staveNotes = o.notes.map((n, i) => {
     // autoStem: stems point down for notes on or above the middle line
     const sn = new StaveNote({ keys: [vexKey(n)], duration: 'q', autoStem: true });
     const color = COLORS[o.statuses[i] ?? 'pending'];
     sn.setStyle({ fillStyle: color, strokeStyle: color });
-    const isShift = i === shiftAt;
+    const isShift = shifts.has(i);
     const fingering = fingerings?.[i];
     if (fingering) {
       addFingering(sn, fingering, fingerings?.[i - 1], color, isShift);
@@ -163,11 +169,12 @@ export function renderScore(
       // fingerings hidden: still say where the hand moves
       sn.addModifier(annotation('shift', STRING_LABEL_COLOR, 10, Annotation.VerticalJustify.TOP), 0);
     }
-    if (isShift && o.guideNote) {
-      const guide = new GraceNote({ keys: [vexKey(o.guideNote.note)], duration: '8', slash: false });
+    const guideNote = isShift ? o.guideNotes?.[i] : null;
+    if (guideNote) {
+      const guide = new GraceNote({ keys: [vexKey(guideNote.note)], duration: '8', slash: false });
       guide.setStyle({ fillStyle: GUIDE_NOTE_COLOR, strokeStyle: GUIDE_NOTE_COLOR });
-      if (o.guideNote.accidental !== null) {
-        guide.addModifier(new Accidental(o.guideNote.accidental || 'n'), 0);
+      if (guideNote.accidental !== null) {
+        guide.addModifier(new Accidental(guideNote.accidental || 'n'), 0);
       }
       sn.addModifier(new GraceNoteGroup([guide], true), 0);
     }

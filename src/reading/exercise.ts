@@ -10,8 +10,8 @@ export interface LineState {
   position: Position | null;
   /** position each note is played in (differs from `position` before a shift) */
   positions: (Position | null)[];
-  /** index of the first note after the shift, if the line shifts */
-  shiftAt: number | null;
+  /** indices of the first note after each shift */
+  shifts: number[];
   notes: SpelledNote[];
   cursor: number;
   statuses: NoteStatus[];
@@ -36,7 +36,7 @@ export type ExerciseAction =
       key: Key;
       position: Position | null;
       positions: (Position | null)[];
-      shiftAt: number | null;
+      shifts: number[];
       notes: SpelledNote[];
     }
   | { type: 'NOTE_CORRECT'; cents: number }
@@ -49,7 +49,7 @@ export const INITIAL_LINE_STATE: LineState = {
   key: { tonic: 'C', mode: 'major' },
   position: null,
   positions: [],
-  shiftAt: null,
+  shifts: [],
   notes: [],
   cursor: 0,
   statuses: [],
@@ -72,7 +72,7 @@ export function exerciseReducer(state: LineState, action: ExerciseAction): LineS
         key: action.key,
         position: action.position,
         positions: action.positions,
-        shiftAt: action.shiftAt,
+        shifts: action.shifts,
         notes: action.notes,
         cursor: 0,
         statuses,
@@ -148,11 +148,52 @@ export interface LineScore {
   /** notes played with no out-of-tune hold */
   inTune: number;
   total: number;
+  /** shift notes (first note after a shift) played so far */
+  shifts: number;
+  /** shift notes that were in tune and the right pitch straight away */
+  shiftsClean: number;
 }
 
 export function lineScore(state: LineState): LineScore {
   const total = state.notes.length;
-  const firstTry = state.wrongCounts.filter((c, i) => c === 0 && i < state.cursor).length;
-  const inTune = state.outOfTuneCounts.filter((c, i) => c === 0 && i < state.cursor).length;
-  return { firstTry, inTune, total };
+  const played = (i: number) => i < state.cursor;
+  const firstTry = state.wrongCounts.filter((c, i) => c === 0 && played(i)).length;
+  const inTune = state.outOfTuneCounts.filter((c, i) => c === 0 && played(i)).length;
+  const shiftNotes = state.shifts.filter(played);
+  const shiftsClean = shiftNotes.filter(
+    (i) => state.wrongCounts[i] === 0 && state.outOfTuneCounts[i] === 0,
+  ).length;
+  return { firstTry, inTune, total, shifts: shiftNotes.length, shiftsClean };
+}
+
+export interface LineDrift {
+  /** mean first-heard cents over the line */
+  average: number;
+  /** mean over the first and second halves, to show the trend */
+  firstHalf: number;
+  secondHalf: number;
+}
+
+/** Average intonation offset of a finished line and how it moved; null with fewer than 4 notes. */
+export function lineDrift(cents: (number | null)[]): LineDrift | null {
+  const values = cents.filter((c): c is number => c !== null);
+  if (values.length < 4) return null;
+  const mean = (xs: number[]) => xs.reduce((sum, x) => sum + x, 0) / xs.length;
+  const half = Math.floor(values.length / 2);
+  return {
+    average: mean(values),
+    firstHalf: mean(values.slice(0, half)),
+    secondHalf: mean(values.slice(values.length - half)),
+  };
+}
+
+/** One-line description of a drift, e.g. "drifting sharp (+3¢ → +17¢)". */
+export function describeDrift(d: LineDrift): string {
+  const fmt = (c: number) => `${c > 0 ? '+' : ''}${Math.round(c)}¢`;
+  const change = d.secondHalf - d.firstHalf;
+  if (Math.abs(change) >= 8) {
+    return `drifting ${change > 0 ? 'sharp' : 'flat'} as the line goes on (${fmt(d.firstHalf)} → ${fmt(d.secondHalf)})`;
+  }
+  if (Math.abs(d.average) >= 8) return `consistently ${d.average > 0 ? 'sharp' : 'flat'} (avg ${fmt(d.average)})`;
+  return `intonation steady (avg ${fmt(d.average)})`;
 }
