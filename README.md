@@ -22,6 +22,11 @@ An installable PWA (React + TypeScript + Vite) with three tools you can toggle b
   per line, and strict ±30¢ intonation are configurable and persisted. It
   shares the tuner's A4 reference and microphone preference. Pitch detection
   is monophonic — play single notes.
+  - **Violin positions** — pick 1st to 7th position and every line stays
+    within that hand frame (D and A strings on easy, all four strings on
+    medium and hard), so you can drill reading in a position without
+    shifting. Optionally show fingerings: the finger number above each note
+    and the string (I–IV) below it wherever the string changes.
 
 ## Development
 

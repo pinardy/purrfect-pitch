@@ -56,6 +56,13 @@ real sources (bundle a tiny script with `node_modules/.bin/esbuild x.ts
 `generateLine` with `DEFAULT_READING_SETTINGS`). Seed 0 + defaults ⇒
 G major: D4 E4 G4 A4 B4 F♯4 G4 A4.
 
+With a violin position set (`position: 1..7` in `reading.settings`), the
+range comes from `exerciseRange` in `src/reading/settings.ts` instead of the
+preset; fingerings render as VexFlow `Annotation` text (finger above, string
+numeral below) inside `.score-canvas`, and the staff SVG grows from 170 to
+198 px tall. Use a sine test tone for notes above ~A5: a sawtooth confuses the
+autocorrelator into octave errors that a real violin does not.
+
 ## Observing sight-reading state
 
 The staff is VexFlow SVG inside `.score-canvas`. Note status = `fill`

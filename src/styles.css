@@ -516,6 +516,10 @@ button {
   font-weight: 700;
 }
 
+.reading-position {
+  color: var(--accent-strong);
+}
+
 .reading-stats {
   color: var(--muted);
   font-size: 13px;

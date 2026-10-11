@@ -36,7 +36,8 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
   minStableFrames: 5,
   silenceFrames: 4,
   minHz: 160,
-  maxHz: 1500,
+  // 7th position on the E string reaches A6 (1760 Hz); leave room for sharp keys
+  maxHz: 2200,
   maxCentsOff: null,
 };
 

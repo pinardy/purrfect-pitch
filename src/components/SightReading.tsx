@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { autoCorrelate } from '../audio/pitch';
 import { useWakeLock } from '../hooks/useWakeLock';
 import CatFace, { type CatMood } from './CatFace';
@@ -10,6 +10,7 @@ import { NoteMatcher, toPitchFrame } from '../reading/matcher';
 import { exerciseReducer, INITIAL_LINE_STATE, lineScore } from '../reading/exercise';
 import { generateLine, mulberry32 } from '../reading/generator';
 import { keyLabel, midiToName, vexKeySignature } from '../reading/theory';
+import { fingeringFor, positionLabel } from '../reading/violin';
 import {
   loadNoteStats,
   saveNoteStats,
@@ -17,6 +18,7 @@ import {
   type NoteStats,
 } from '../reading/noteStats';
 import {
+  exerciseRange,
   loadReadingSettings,
   PRESETS,
   randomKey,
@@ -91,7 +93,7 @@ export default function SightReading() {
     const preset = PRESETS[settings.difficulty];
     const notes = generateLine({
       key,
-      range: preset.range,
+      range: exerciseRange(settings, key),
       maxLeap: preset.maxLeap,
       chromaticProb: preset.chromaticProb,
       noteCount: settings.noteCount,
@@ -100,7 +102,7 @@ export default function SightReading() {
     matcherRef.current.reset();
     matcherRef.current.setTarget(notes[0].midi);
     setWrongFlash(false);
-    dispatch({ type: 'NEW_LINE', key, notes });
+    dispatch({ type: 'NEW_LINE', key, position: settings.position, notes });
   }, [settings]);
 
   function stop() {
@@ -228,6 +230,16 @@ export default function SightReading() {
       ? line.statuses.map((s, i) => (i === line.cursor ? ('wrongFlash' as const) : s))
       : line.statuses;
 
+  // fingerings follow the position the line was generated for, not the settings
+  const position = line.position;
+  const fingerings = useMemo(
+    () =>
+      position !== null && settings.showFingerings
+        ? line.notes.map((n) => fingeringFor(n, position))
+        : undefined,
+    [line.notes, position, settings.showFingerings],
+  );
+
   const score = lineScore(line);
   const accuracy = stats.notes > 0 ? Math.round((stats.firstTry / stats.notes) * 100) : null;
   const mood: CatMood = !listening
@@ -259,7 +271,12 @@ export default function SightReading() {
 
       <div className="reading-topline">
         {line.phase !== 'idle' ? (
-          <span className="reading-key">{keyLabel(line.key)}</span>
+          <span className="reading-key">
+            {keyLabel(line.key)}
+            {position !== null && (
+              <span className="reading-position"> · {positionLabel(position)}</span>
+            )}
+          </span>
         ) : (
           <span className="reading-key">&nbsp;</span>
         )}
@@ -277,6 +294,12 @@ export default function SightReading() {
               Random notes appear on the staff. Play each one on your instrument — the
               cursor moves on when you hit the right pitch.
             </p>
+            {settings.position !== null && (
+              <p className="hint">
+                Lines stay within {positionLabel(settings.position)} on the violin
+                {settings.showFingerings ? ', with fingerings shown above each note' : ''}.
+              </p>
+            )}
             <p className="hint">Start the microphone to begin.</p>
           </div>
         ) : (
@@ -285,6 +308,7 @@ export default function SightReading() {
             statuses={displayStatuses}
             cursor={line.cursor}
             keySignature={vexKeySignature(line.key)}
+            fingerings={fingerings}
           />
         )}
 

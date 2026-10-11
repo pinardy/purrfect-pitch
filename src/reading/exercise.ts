@@ -2,9 +2,12 @@
 
 import type { Key, SpelledNote } from './theory';
 import type { NoteStatus } from './renderScore';
+import type { Position } from './violin';
 
 export interface LineState {
   key: Key;
+  /** position the line was generated for; null = free range */
+  position: Position | null;
   notes: SpelledNote[];
   cursor: number;
   statuses: NoteStatus[];
@@ -14,13 +17,14 @@ export interface LineState {
 }
 
 export type ExerciseAction =
-  | { type: 'NEW_LINE'; key: Key; notes: SpelledNote[] }
+  | { type: 'NEW_LINE'; key: Key; position: Position | null; notes: SpelledNote[] }
   | { type: 'NOTE_CORRECT' }
   | { type: 'NOTE_WRONG' }
   | { type: 'STOP' };
 
 export const INITIAL_LINE_STATE: LineState = {
   key: { tonic: 'C', mode: 'major' },
+  position: null,
   notes: [],
   cursor: 0,
   statuses: [],
@@ -36,6 +40,7 @@ export function exerciseReducer(state: LineState, action: ExerciseAction): LineS
       );
       return {
         key: action.key,
+        position: action.position,
         notes: action.notes,
         cursor: 0,
         statuses,
