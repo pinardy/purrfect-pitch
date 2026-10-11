@@ -44,6 +44,7 @@ interface SessionStats {
   lines: number;
   notes: number;
   firstTry: number;
+  inTune: number;
 }
 
 export default function SightReading() {
@@ -51,7 +52,7 @@ export default function SightReading() {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(loadReadingSettings);
   const [showSettings, setShowSettings] = useState(false);
-  const [stats, setStats] = useState<SessionStats>({ lines: 0, notes: 0, firstTry: 0 });
+  const [stats, setStats] = useState<SessionStats>({ lines: 0, notes: 0, firstTry: 0, inTune: 0 });
   const [noteStats, setNoteStats] = useState<NoteStats>(loadNoteStats);
   const [heard, setHeard] = useState<{ midi: number; cents: number } | null>(null);
   const [wrongFlash, setWrongFlash] = useState(false);
@@ -71,16 +72,14 @@ export default function SightReading() {
   const happyTimer = useRef(0);
   const lastHeardUpdate = useRef(0);
 
-  // apply intonation strictness without losing the current target
+  // apply the intonation tolerance without losing the current target
   useEffect(() => {
-    matcherRef.current = new NoteMatcher({
-      maxCentsOff: settings.strictIntonation ? 30 : null,
-    });
+    matcherRef.current = new NoteMatcher({ maxCentsOff: settings.intonationTolerance });
     const current = lineRef.current;
     matcherRef.current.setTarget(
       current.phase === 'playing' ? current.notes[current.cursor]?.midi ?? null : null,
     );
-  }, [settings.strictIntonation]);
+  }, [settings.intonationTolerance]);
 
   const updateSettings = useCallback((next: Settings) => {
     setSettings(next);
@@ -175,8 +174,12 @@ export default function SightReading() {
         if (event && lineRef.current.phase === 'playing') {
           if (event.type === 'correct') {
             const current = lineRef.current;
+            const i = current.cursor;
             setNoteStats((s) =>
-              withNoteResult(s, current.notes[current.cursor], current.wrongCounts[current.cursor] > 0),
+              withNoteResult(s, current.notes[i], {
+                missed: current.wrongCounts[i] > 0,
+                outOfTuneCents: current.outOfTuneCounts[i] > 0 ? current.outOfTuneCents[i] : null,
+              }),
             );
             const nextCursor = current.cursor + 1;
             matcherRef.current.setTarget(
@@ -186,6 +189,9 @@ export default function SightReading() {
             setHappyFlash(true);
             window.clearTimeout(happyTimer.current);
             happyTimer.current = window.setTimeout(() => setHappyFlash(false), HAPPY_FLASH_MS);
+          } else if (event.type === 'outOfTune') {
+            // hold the line: the note turns yellow until it is bent into tune
+            dispatch({ type: 'NOTE_OUT_OF_TUNE', cents: event.cents });
           } else {
             dispatch({ type: 'NOTE_WRONG' });
             setWrongFlash(true);
@@ -218,6 +224,7 @@ export default function SightReading() {
       lines: s.lines + 1,
       notes: s.notes + score.total,
       firstTry: s.firstTry + score.firstTry,
+      inTune: s.inTune + score.inTune,
     }));
     const timer = window.setTimeout(() => newLine(), AUTO_NEXT_MS);
     return () => window.clearTimeout(timer);
@@ -242,6 +249,15 @@ export default function SightReading() {
 
   const score = lineScore(line);
   const accuracy = stats.notes > 0 ? Math.round((stats.firstTry / stats.notes) * 100) : null;
+  const intonation = stats.notes > 0 ? Math.round((stats.inTune / stats.notes) * 100) : null;
+  const checkingIntonation = settings.intonationTolerance !== null;
+  const holdingOutOfTune =
+    line.phase === 'playing' && line.statuses[line.cursor] === 'outOfTune' && heard !== null;
+  const tuningHint = holdingOutOfTune
+    ? heard.cents > 0
+      ? ' · too sharp, ease down'
+      : ' · too flat, push up'
+    : '';
   const mood: CatMood = !listening
     ? 'sleepy'
     : wrongFlash
@@ -283,6 +299,7 @@ export default function SightReading() {
         {accuracy !== null && (
           <span className="reading-stats">
             {stats.lines} line{stats.lines === 1 ? '' : 's'} · {accuracy}% first try
+            {checkingIntonation && intonation !== null && ` · ${intonation}% in tune`}
           </span>
         )}
       </div>
@@ -315,7 +332,11 @@ export default function SightReading() {
         {line.phase === 'summary' && (
           <div className="score-summary">
             <span className="score-summary-result">
-              {score.firstTry}/{score.total} first try{score.firstTry === score.total ? ' · purrfect!' : ''}
+              {score.firstTry}/{score.total} first try
+              {checkingIntonation && ` · ${score.inTune}/${score.total} in tune`}
+              {score.firstTry === score.total && (!checkingIntonation || score.inTune === score.total)
+                ? ' · purrfect!'
+                : ''}
             </span>
             <span className="hint">next line in a moment…</span>
           </div>
@@ -323,9 +344,9 @@ export default function SightReading() {
       </div>
 
       <div className="readout">
-        <span className="freq-readout">
+        <span className={'freq-readout' + (holdingOutOfTune ? ' out-of-tune' : '')}>
           {heard
-            ? `Hearing ${midiToName(heard.midi)} · ${heard.cents > 0 ? '+' : ''}${heard.cents}¢`
+            ? `Hearing ${midiToName(heard.midi)} · ${heard.cents > 0 ? '+' : ''}${heard.cents}¢${tuningHint}`
             : listening
               ? 'Play the highlighted note…'
               : 'Tap start and play the highlighted note'}

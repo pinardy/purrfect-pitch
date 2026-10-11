@@ -19,9 +19,15 @@ An installable PWA (React + TypeScript + Vite) with three tools you can toggle b
   listens while you play and the cursor advances when you hit the right pitch.
   Correct notes turn green (orange if you missed first), wrong attempts flash
   red, and a first-try score is tallied per line. Difficulty, key mode, notes
-  per line, and strict ±30¢ intonation are configurable and persisted. It
+  per line, and intonation tolerance are configurable and persisted. It
   shares the tuner's A4 reference and microphone preference. Pitch detection
   is monophonic — play single notes.
+  - **Intonation** — a note held more than ±10/20/30¢ off (your choice, or
+    off) turns yellow and the line waits until you bend it into tune; the
+    readout says whether to ease down or push up. It still counts as read
+    correctly, and each line also scores how many notes were in tune. The
+    all-time note stats panel has an **Intonation** view listing the notes you
+    most often play out of tune and whether they tend sharp or flat.
   - **Violin positions** — pick 1st to 7th position and every line stays
     within that hand frame (D and A strings on easy, all four strings on
     medium and hard), so you can drill reading in a position without

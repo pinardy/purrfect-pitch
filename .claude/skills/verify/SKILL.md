@@ -66,9 +66,14 @@ autocorrelator into octave errors that a real violin does not.
 ## Observing sight-reading state
 
 The staff is VexFlow SVG inside `.score-canvas`. Note status = `fill`
-attribute: correct `#2f9e4d`, missed-then-correct `#e8871e`, wrong flash
+attribute: correct `#2f9e4d`, missed-then-correct `#e8871e`, out of tune
+(held, or corrected after being out of tune) `#d9a400`, wrong flash
 `#e0554f` (500 ms), current `#ec5f96`, pending `#5b4636`. Poll counts of
-green+orange fills to detect cursor advancement; body text shows
-`Hearing <note> · <cents>¢`, key label, and `N/M first try` on the summary
-overlay. Settings persist in localStorage `reading.settings` (tuner:
+green+orange+yellow fills to detect cursor advancement; body text shows
+`Hearing <note> · <cents>¢` (plus `· too sharp, ease down` / `· too flat,
+push up` while holding out of tune), key label, and `N/M first try · N/M in
+tune` on the summary overlay. `reading.settings.intonationTolerance` is the
+cents tolerance (null = off); a tone within the same semitone but beyond it
+(e.g. +40¢ with ±30) holds the line on a yellow note until the tone is
+brought within tolerance — no re-attack needed. Settings persist in localStorage `reading.settings` (tuner:
 `tuner.a4`, `tuner.inputDevice`).

@@ -13,7 +13,8 @@ export interface ReadingSettings {
   /** 'random-major' | 'random-any' | fixed key */
   keyMode: 'random-major' | 'random-any' | 'fixed';
   fixedKey: Key;
-  strictIntonation: boolean;
+  /** cents tolerance before a note counts as out of tune; null = pitch class only */
+  intonationTolerance: number | null;
   noteCount: number;
   /** violin left-hand position to stay within; null = free range from the difficulty preset */
   position: Position | null;
@@ -66,11 +67,13 @@ export const PRESETS: Record<Difficulty, DifficultyPreset> = {
   },
 };
 
+export const INTONATION_TOLERANCES = [10, 20, 30];
+
 export const DEFAULT_READING_SETTINGS: ReadingSettings = {
   difficulty: 'easy',
   keyMode: 'random-major',
   fixedKey: { tonic: 'C', mode: 'major' },
-  strictIntonation: false,
+  intonationTolerance: 20,
   noteCount: 8,
   position: null,
   showFingerings: true,
@@ -102,7 +105,13 @@ export function loadReadingSettings(): ReadingSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_READING_SETTINGS;
-    return { ...DEFAULT_READING_SETTINGS, ...(JSON.parse(raw) as Partial<ReadingSettings>) };
+    const stored = JSON.parse(raw) as Partial<ReadingSettings> & { strictIntonation?: boolean };
+    // migrate the former on/off "strict intonation" switch (±30¢ when on)
+    const { strictIntonation, ...rest } = stored;
+    if (strictIntonation !== undefined && rest.intonationTolerance === undefined) {
+      rest.intonationTolerance = strictIntonation ? 30 : DEFAULT_READING_SETTINGS.intonationTolerance;
+    }
+    return { ...DEFAULT_READING_SETTINGS, ...rest };
   } catch {
     return DEFAULT_READING_SETTINGS;
   }

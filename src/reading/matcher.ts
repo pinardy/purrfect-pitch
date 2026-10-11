@@ -27,7 +27,11 @@ export interface MatcherConfig {
   silenceFrames: number;
   minHz: number;
   maxHz: number;
-  /** when set, frames further off than this many cents are treated as unvoiced */
+  /**
+   * Intonation tolerance: the target note only registers as correct once its
+   * cents offset (averaged over the stable frames) is within this; a stable
+   * target pitch outside it reports `outOfTune`. null disables the check.
+   */
   maxCentsOff: number | null;
 }
 
@@ -42,8 +46,10 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
 };
 
 export type MatcherEvent =
-  | { type: 'correct'; midi: number }
-  | { type: 'wrong'; midi: number };
+  | { type: 'correct'; midi: number; cents: number }
+  | { type: 'wrong'; midi: number }
+  /** the target pitch, held steadily but outside the intonation tolerance */
+  | { type: 'outOfTune'; midi: number; cents: number };
 
 /**
  * Pure frame-driven state machine that decides when a played note registers.
@@ -52,7 +58,9 @@ export type MatcherEvent =
  * rounded MIDI value. After a correct hit the matcher disarms so a sustained
  * note cannot auto-advance through the next target; it re-arms on a different
  * pitch (fast flowing playing) or after a brief silence. A wrong pitch is
- * flagged once, not per frame.
+ * flagged once, not per frame. With an intonation tolerance, the target pitch
+ * held out of tune is flagged once as `outOfTune` and then keeps being
+ * watched, so bending it into tune registers it without re-attacking.
  */
 export class NoteMatcher {
   private config: MatcherConfig;
@@ -64,6 +72,9 @@ export class NoteMatcher {
   private silenceCount = 0;
   private lastAcceptedMidi: number | null = null;
   private wrongEmittedFor = new Set<number>();
+  /** cents of the most recent stable frames, for a vibrato-tolerant average */
+  private centsWindow: number[] = [];
+  private outOfTuneEmitted = false;
 
   constructor(config: Partial<MatcherConfig> = {}) {
     this.config = { ...DEFAULT_MATCHER_CONFIG, ...config };
@@ -80,14 +91,20 @@ export class NoteMatcher {
     this.silenceCount = 0;
     this.lastAcceptedMidi = null;
     this.wrongEmittedFor.clear();
+    this.centsWindow = [];
+    this.outOfTuneEmitted = false;
   }
 
   private isVoiced(frame: PitchFrame): boolean {
     const c = this.config;
     if (frame.rms < c.rmsGate) return false;
     if (frame.hz < c.minHz || frame.hz > c.maxHz) return false;
-    if (c.maxCentsOff !== null && Math.abs(frame.cents) > c.maxCentsOff) return false;
     return true;
+  }
+
+  private averageCents(): number {
+    const w = this.centsWindow;
+    return w.reduce((sum, c) => sum + c, 0) / w.length;
   }
 
   /** Feed one analysis frame; `null` means no pitch was detected this frame. */
@@ -95,6 +112,8 @@ export class NoteMatcher {
     if (frame === null || !this.isVoiced(frame)) {
       this.stableMidi = null;
       this.stableCount = 0;
+      this.centsWindow = [];
+      this.outOfTuneEmitted = false;
       if (++this.silenceCount >= this.config.silenceFrames) {
         this.armed = true;
         this.wrongEmittedFor.clear();
@@ -109,7 +128,11 @@ export class NoteMatcher {
     } else {
       this.stableMidi = frame.midi;
       this.stableCount = 1;
+      this.centsWindow = [];
+      this.outOfTuneEmitted = false;
     }
+    this.centsWindow.push(frame.cents);
+    if (this.centsWindow.length > this.config.minStableFrames) this.centsWindow.shift();
 
     // A genuinely new pitch re-arms without requiring silence.
     if (this.lastAcceptedMidi !== null && frame.midi !== this.lastAcceptedMidi && !this.armed) {
@@ -118,18 +141,29 @@ export class NoteMatcher {
     }
 
     if (!this.armed || this.target === null) return null;
+    if (this.stableCount < this.config.minStableFrames) return null;
 
-    if (this.stableCount === this.config.minStableFrames) {
-      if (frame.midi === this.target) {
-        this.armed = false;
-        this.lastAcceptedMidi = frame.midi;
-        this.wrongEmittedFor.clear();
-        return { type: 'correct', midi: frame.midi };
-      }
-      if (!this.wrongEmittedFor.has(frame.midi)) {
+    if (frame.midi !== this.target) {
+      if (this.stableCount === this.config.minStableFrames && !this.wrongEmittedFor.has(frame.midi)) {
         this.wrongEmittedFor.add(frame.midi);
         return { type: 'wrong', midi: frame.midi };
       }
+      return null;
+    }
+
+    // The target pitch: accept it once it is within tolerance, however long it
+    // took to bend into tune.
+    const cents = this.averageCents();
+    const tolerance = this.config.maxCentsOff;
+    if (tolerance === null || Math.abs(cents) <= tolerance) {
+      this.armed = false;
+      this.lastAcceptedMidi = frame.midi;
+      this.wrongEmittedFor.clear();
+      return { type: 'correct', midi: frame.midi, cents };
+    }
+    if (!this.outOfTuneEmitted) {
+      this.outOfTuneEmitted = true;
+      return { type: 'outOfTune', midi: frame.midi, cents };
     }
     return null;
   }

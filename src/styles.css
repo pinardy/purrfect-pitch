@@ -613,6 +613,15 @@ button {
   color: var(--muted);
 }
 
+.note-acc-views {
+  margin-top: 12px;
+}
+
+.note-acc-views .chip {
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
 .note-acc-list {
   display: flex;
   flex-direction: column;
@@ -655,6 +664,14 @@ button {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.note-acc-tendency {
+  color: #b38600;
+}
+
+.freq-readout.out-of-tune {
+  color: #b38600;
 }
 
 .note-acc-reset {

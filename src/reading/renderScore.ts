@@ -17,13 +17,23 @@ import type { SpelledNote } from './theory';
 import { vexKey } from './theory';
 import type { Fingering } from './violin';
 
-export type NoteStatus = 'pending' | 'current' | 'correct' | 'correctAfterMiss' | 'wrongFlash';
+export type NoteStatus =
+  | 'pending'
+  | 'current'
+  /** the right pitch, held but out of tune — waiting to be corrected */
+  | 'outOfTune'
+  | 'correct'
+  | 'correctAfterMiss'
+  | 'correctAfterOutOfTune'
+  | 'wrongFlash';
 
 const COLORS: Record<NoteStatus, string> = {
   pending: '#5b4636',
   current: '#ec5f96',
+  outOfTune: '#d9a400',
   correct: '#2f9e4d',
   correctAfterMiss: '#e8871e',
+  correctAfterOutOfTune: '#d9a400',
   wrongFlash: '#e0554f',
 };
 

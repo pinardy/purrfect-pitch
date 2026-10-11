@@ -1,4 +1,5 @@
 import type { Difficulty, ReadingSettings as Settings } from '../reading/settings';
+import { INTONATION_TOLERANCES } from '../reading/settings';
 import { MAJOR_TONICS, MINOR_TONICS } from '../reading/theory';
 import { POSITIONS, positionLabel, type Position } from '../reading/violin';
 
@@ -154,17 +155,30 @@ export default function ReadingSettings({ settings, onChange, onClose }: Props) 
           ))}
         </div>
 
-        <label className="check-row">
-          <input
-            type="checkbox"
-            checked={settings.strictIntonation}
-            onChange={(e) => set('strictIntonation', e.target.checked)}
-          />
-          <span>Strict intonation (within ±30 cents)</span>
-        </label>
+        <span className="field-label">Intonation</span>
+        <div className="presets">
+          {INTONATION_TOLERANCES.map((cents) => (
+            <button
+              key={cents}
+              className={'chip' + (cents === settings.intonationTolerance ? ' active' : '')}
+              onClick={() => set('intonationTolerance', cents)}
+            >
+              ±{cents}¢
+            </button>
+          ))}
+          <button
+            className={'chip' + (settings.intonationTolerance === null ? ' active' : '')}
+            onClick={() => set('intonationTolerance', null)}
+          >
+            Off
+          </button>
+        </div>
         <p className="hint">
-          Notes are checked against the tuner&apos;s A4 reference. Play single notes —
-          pitch detection is monophonic.
+          {settings.intonationTolerance === null
+            ? 'Any pitch closer to the written note than its neighbours moves the line on.'
+            : `A note held more than ${settings.intonationTolerance}¢ off turns yellow and waits until you bend it into tune. It still counts as read correctly, but not as in tune.`}{' '}
+          Pitch is measured against the tuner&apos;s A4 reference. Play single notes — pitch
+          detection is monophonic.
         </p>
       </div>
     </div>
