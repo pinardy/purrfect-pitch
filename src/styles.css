@@ -393,10 +393,14 @@ button {
 
 .sheet {
   width: min(460px, 100%);
+  /* never taller than the screen: the settings list scrolls inside the sheet */
+  max-height: calc(100dvh - 12px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 22px 22px max(28px, env(safe-area-inset-bottom));
+  padding: 0 22px max(28px, env(safe-area-inset-bottom));
   border: 2px solid var(--border);
   border-bottom: none;
   border-radius: 28px 28px 0 0;
@@ -404,9 +408,15 @@ button {
 }
 
 .sheet-header {
+  /* stays put while the settings scroll, so Close is always reachable */
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 22px 0 6px;
+  background: var(--bg-card);
 }
 
 .sheet-header h2 {
@@ -505,8 +515,10 @@ button {
 
 .reading-topline {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: baseline;
+  gap: 2px 12px;
   width: 100%;
   min-height: 20px;
 }
@@ -586,17 +598,22 @@ button {
 }
 
 .score-summary-result {
-  font-size: 22px;
+  padding: 0 16px;
+  text-align: center;
+  font-size: clamp(17px, 5.5vw, 22px);
   font-weight: 700;
+  line-height: 1.25;
   color: var(--happy);
 }
 
 .reading-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   width: 100%;
 }
+
 
 .note-accuracy {
   width: 100%;
@@ -635,8 +652,16 @@ button {
   display: grid;
   grid-template-columns: 56px 1fr auto;
   align-items: center;
-  gap: 10px;
+  gap: 0 10px;
   font-size: 13px;
+}
+
+/* intonation detail sits under the bar instead of squeezing it */
+.note-acc-sub {
+  grid-column: 2 / 4;
+  color: #b38600;
+  font-size: 12px;
+  line-height: 1.3;
 }
 
 .note-acc-name {
@@ -664,10 +689,6 @@ button {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.note-acc-tendency {
-  color: #b38600;
 }
 
 .freq-readout.out-of-tune {
@@ -884,7 +905,7 @@ button {
 
 .fb-label {
   fill: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -900,7 +921,7 @@ button {
 
 .fb-finger {
   fill: #fff;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -937,7 +958,8 @@ button {
 .cents-cells {
   flex: 1;
   display: flex;
-  gap: 4px;
+  gap: 3px;
+  min-width: 0;
 }
 
 .cents-cell {
@@ -959,8 +981,8 @@ button {
 .cents-dot {
   position: absolute;
   left: 50%;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
   background: #2f9e4d;
@@ -1054,13 +1076,30 @@ button {
 
 .history-day-label {
   margin-top: 4px;
+  height: 13px;
   text-align: center;
   color: var(--muted);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.history-day {
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.history-day.selected {
+  background: #fff4e6;
+}
+
+.history-caption {
+  margin: 8px 0 0;
+  min-height: 18px;
+  text-align: center;
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .history-table {
@@ -1100,4 +1139,11 @@ button {
   color: var(--muted);
   font-size: 10px;
   font-weight: 700;
+}
+
+/* narrow phones: Start/Stop on its own row, the other buttons share the next */
+@media (max-width: 420px) {
+  .reading-controls .primary-btn {
+    flex: 1 1 100%;
+  }
 }

@@ -96,12 +96,12 @@ export default function NoteAccuracy({ stats, onReset }: Props) {
               </span>
               <span className="note-acc-pct">
                 {Math.round(value * 100)}% · {count}/{r.attempts}
-                {view === 'intonation' && r.tendency && (
-                  <span className="note-acc-tendency">
-                    {' '}· {TENDENCY_LABEL[r.tendency]} · avg {formatCents(r.avgCents)}
-                  </span>
-                )}
               </span>
+              {view === 'intonation' && r.tendency && (
+                <span className="note-acc-sub">
+                  {TENDENCY_LABEL[r.tendency]} · avg {formatCents(r.avgCents)}
+                </span>
+              )}
             </div>
           );
         })}
