@@ -13,6 +13,7 @@ interface Props {
   fingerings?: (Fingering | null)[];
   shifts?: number[];
   guideNotes?: (GuideNote | null)[];
+  intervals?: (string | null)[];
   onTap?: () => void;
 }
 
@@ -24,6 +25,7 @@ export default function ScoreView({
   fingerings,
   shifts,
   guideNotes,
+  intervals,
   onTap,
 }: Props) {
   const headerRef = useRef<HTMLDivElement>(null);
@@ -54,12 +56,13 @@ export default function ScoreView({
       fingerings,
       shifts,
       guideNotes,
+      intervals,
     });
     // when the line is wider than the viewport, keep the current note centered
     if (cursorX !== null && notesEl.scrollWidth > notesEl.clientWidth) {
       notesEl.scrollTo({ left: cursorX - notesEl.clientWidth / 2, behavior: 'smooth' });
     }
-  }, [notes, statuses, cursor, keySignature, fingerings, shifts, guideNotes, width]);
+  }, [notes, statuses, cursor, keySignature, fingerings, shifts, guideNotes, intervals, width]);
 
   return (
     <div ref={wrapRef} className="score-line" onClick={onTap}>

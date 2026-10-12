@@ -14,7 +14,12 @@ function csvRow(cells: (string | number)[]): string {
     .join(',');
 }
 
-export function statsToCsv(noteStats: NoteStats, fingerStats: NoteStats, history: History): string {
+export function statsToCsv(
+  noteStats: NoteStats,
+  fingerStats: NoteStats,
+  intervalStats: NoteStats,
+  history: History,
+): string {
   const lines: string[] = [];
   lines.push('# Notes');
   lines.push(csvRow(['note', 'position', 'attempts', 'misses', 'out_of_tune', 'sharp', 'flat', 'avg_cents', 'tendency']));
@@ -43,6 +48,23 @@ export function statsToCsv(noteStats: NoteStats, fingerStats: NoteStats, history
       csvRow([
         finger,
         position,
+        s.attempts,
+        s.misses,
+        s.outOfTune ?? 0,
+        s.sharp ?? 0,
+        s.flat ?? 0,
+        averageCents(s).toFixed(1),
+        intonationTendency(s) ?? '',
+      ]),
+    );
+  }
+  lines.push('');
+  lines.push('# Intervals');
+  lines.push(csvRow(['interval', 'attempts', 'misses', 'out_of_tune', 'sharp', 'flat', 'avg_cents', 'tendency']));
+  for (const [key, s] of Object.entries(intervalStats)) {
+    lines.push(
+      csvRow([
+        key,
         s.attempts,
         s.misses,
         s.outOfTune ?? 0,

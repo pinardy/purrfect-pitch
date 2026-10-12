@@ -85,7 +85,20 @@ clicks a hidden anchor (stub `HTMLAnchorElement.prototype.click` to capture
 the filename). The settings sheet is `details.settings-section` groups under
 a preset chip row. At ≥700 px wide in landscape `.card.reading` becomes a
 two-column grid with the fingerboard and cat on the right. Set the tab by
-clicking the "Sight Read" button, not via localStorage. Use a sine test tone for notes above ~A5: a sawtooth confuses the
+clicking the "Sight Read" button, not via localStorage.
+
+`material: 'scale' | 'arpeggio' | 'thirds' | 'intervals'` replaces random
+notes (`planLine` → `generateMaterial`; seed 0 + D major + 3rd position +
+scale ⇒ D4 E4 F♯4 G4 A4 B4 C♯5 D5). `showIntervals: true` adds
+`.score-canvas text.interval-label` between note pairs (SVG grows 14 px);
+interval stats live in `reading.intervalStats` keyed "↑M3". `drone:
+'tonic' | 'G' | 'D' | 'A' | 'E'` starts one sine OscillatorNode below 170 Hz
+while listening and sets the mic chain's notch BiquadFilterNode to that
+frequency (parked at 5 Hz otherwise); `.drone-chip` above the readout
+toggles mute. Stub `OscillatorNode.prototype.start` /
+`AudioParam.prototype.setTargetAtTime` to observe it; the drone never reaches
+the fake mic stream, so the notch is verified offline (see
+`autoCorrelate` with a notched synthetic mix) rather than in-browser. Use a sine test tone for notes above ~A5: a sawtooth confuses the
 autocorrelator into octave errors that a real violin does not.
 
 ## Observing sight-reading state

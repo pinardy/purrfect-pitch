@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { autoCorrelate } from '../audio/pitch';
-import { hapticCue, playCue, playReferenceTone } from '../audio/tone';
+import { hapticCue, playCue, playReferenceTone, startDrone, stopDrone } from '../audio/tone';
 import { useWakeLock } from '../hooks/useWakeLock';
 import CatFace, { type CatMood } from './CatFace';
 import CentsStrip from './CentsStrip';
@@ -18,18 +18,21 @@ import {
   lineDrift,
   lineScore,
 } from '../reading/exercise';
+import { droneLabel, droneMidi } from '../reading/drone';
 import { shareCsv, statsToCsv } from '../reading/exportStats';
 import { mulberry32 } from '../reading/generator';
 import { dayOf, loadHistory, saveHistory, withLineResult, type History } from '../reading/history';
 import { planLine } from '../reading/lineplan';
 import type { GuideNote } from '../reading/renderScore';
-import { keyAlterations, keyLabel, midiToName, vexKeySignature } from '../reading/theory';
+import { intervalName, keyAlterations, keyLabel, midiToName, vexKeySignature } from '../reading/theory';
 import { fingeringFor, guideNote, positionLabel, positionOrdinal } from '../reading/violin';
 import {
   fingerKey,
   loadFingerStats,
+  loadIntervalStats,
   loadNoteStats,
   saveFingerStats,
+  saveIntervalStats,
   saveNoteStats,
   withNoteResult,
   withResult,
@@ -47,6 +50,8 @@ const WRONG_FLASH_MS = 500;
 const HAPPY_FLASH_MS = 700;
 const HEARD_UPDATE_MS = 66;
 const AUTO_NEXT_MS = 3000;
+/** where the mic notch parks when no drone plays: far below anything the violin produces */
+const NOTCH_IDLE_HZ = 5;
 
 // Shared with the tuner: same reference pitch and mic preference everywhere
 const A4_STORAGE_KEY = 'tuner.a4';
@@ -76,6 +81,8 @@ export default function SightReading() {
   const [stats, setStats] = useState<SessionStats>(EMPTY_SESSION);
   const [noteStats, setNoteStats] = useState<NoteStats>(loadNoteStats);
   const [fingerStats, setFingerStats] = useState<NoteStats>(loadFingerStats);
+  const [intervalStats, setIntervalStats] = useState<NoteStats>(loadIntervalStats);
+  const [droneMuted, setDroneMuted] = useState(false);
   const [history, setHistory] = useState<History>(loadHistory);
   const [heard, setHeard] = useState<{ midi: number; cents: number } | null>(null);
   const [wrongFlash, setWrongFlash] = useState(false);
@@ -89,6 +96,8 @@ export default function SightReading() {
   const ctxRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef(0);
+  /** notch on the mic input that removes the drone before pitch detection */
+  const notchRef = useRef<BiquadFilterNode | null>(null);
   const matcherRef = useRef(new NoteMatcher());
   const lineRef = useRef(line);
   lineRef.current = line;
@@ -127,6 +136,8 @@ export default function SightReading() {
   }, [settings]);
 
   function stop() {
+    stopDrone();
+    notchRef.current = null;
     cancelAnimationFrame(rafRef.current);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
@@ -138,9 +149,10 @@ export default function SightReading() {
     dispatch({ type: 'STOP' });
   }
 
-  // Release the microphone and audio context when leaving the tab
+  // Release the microphone, drone and audio context when leaving the tab
   useEffect(
     () => () => {
+      stopDrone();
       cancelAnimationFrame(rafRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       void ctxRef.current?.close().catch(() => {});
@@ -176,7 +188,16 @@ export default function SightReading() {
       await ctx.resume();
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 2048;
-      ctx.createMediaStreamSource(stream).connect(analyser);
+      // mic → gentle high-pass (rumble) → notch (the drone, when one plays) → analyser
+      const highpass = ctx.createBiquadFilter();
+      highpass.type = 'highpass';
+      highpass.frequency.value = 150;
+      const notch = ctx.createBiquadFilter();
+      notch.type = 'notch';
+      notch.Q.value = 20;
+      notch.frequency.value = NOTCH_IDLE_HZ;
+      ctx.createMediaStreamSource(stream).connect(highpass).connect(notch).connect(analyser);
+      notchRef.current = notch;
       ctxRef.current = ctx;
       streamRef.current = stream;
       setListening(true);
@@ -211,6 +232,10 @@ export default function SightReading() {
             };
             const position = current.positions[i];
             setNoteStats((s) => withNoteResult(s, current.notes[i], position, result));
+            if (i > 0) {
+              const interval = intervalName(current.notes[i - 1], current.notes[i]);
+              setIntervalStats((s) => withResult(s, interval, result));
+            }
             if (position !== null) {
               const fingering = fingeringFor(current.notes[i], position, settingsRef.current.useOpenStrings);
               if (fingering) {
@@ -257,6 +282,25 @@ export default function SightReading() {
   useEffect(() => {
     saveFingerStats(fingerStats);
   }, [fingerStats]);
+
+  useEffect(() => {
+    saveIntervalStats(intervalStats);
+  }, [intervalStats]);
+
+  // the drone follows the line's key while listening (and is silenced by the mute
+  // toggle); the mic notch tracks it so the detector never hears it
+  const droneNote = line.phase === 'idle' ? null : droneMidi(settings.drone, line.key);
+  useEffect(() => {
+    const notch = notchRef.current;
+    if (!listening || droneNote === null || droneMuted) {
+      stopDrone();
+      notch?.frequency.setTargetAtTime(NOTCH_IDLE_HZ, notch.context.currentTime, 0.02);
+      return;
+    }
+    const hz = loadA4() * 2 ** ((droneNote - 69) / 12);
+    notch?.frequency.setTargetAtTime(hz, notch.context.currentTime, 0.02);
+    void startDrone(hz);
+  }, [listening, droneNote, droneMuted]);
 
   useEffect(() => {
     saveHistory(history);
@@ -376,9 +420,17 @@ export default function SightReading() {
     if (target) void playReferenceTone(target.midi, loadA4());
   };
 
+  const intervals = useMemo(
+    () =>
+      settings.showIntervals
+        ? line.notes.map((n, i) => (i === 0 ? null : intervalName(line.notes[i - 1], n)))
+        : undefined,
+    [settings.showIntervals, line.notes],
+  );
+
   const exportStats = async () => {
     const outcome = await shareCsv(
-      statsToCsv(noteStats, fingerStats, history),
+      statsToCsv(noteStats, fingerStats, intervalStats, history),
       `purrfect-pitch-stats-${dayOf(new Date())}.csv`,
     );
     setExportNote(outcome === 'shared' ? 'Stats shared.' : 'Stats downloaded as CSV.');
@@ -388,6 +440,7 @@ export default function SightReading() {
   const resetStats = () => {
     setNoteStats({});
     setFingerStats({});
+    setIntervalStats({});
   };
 
   return (
@@ -467,6 +520,7 @@ export default function SightReading() {
             fingerings={fingerings ?? undefined}
             shifts={line.shifts}
             guideNotes={guideNotes}
+            intervals={intervals}
             onTap={canTapForFingerings ? () => dispatch({ type: 'TOGGLE_REVEAL' }) : undefined}
           />
         )}
@@ -513,6 +567,18 @@ export default function SightReading() {
         />
       )}
 
+      {listening && line.phase !== 'idle' && settings.drone !== 'off' && (
+        <button
+          className={'chip drone-chip' + (droneMuted ? '' : ' active')}
+          onClick={() => setDroneMuted((m) => !m)}
+          aria-pressed={!droneMuted}
+        >
+          {droneMuted ? '♩ ' : '♪ '}
+          {droneLabel(settings.drone, line.key)}
+          {droneMuted ? ' (muted)' : ''}
+        </button>
+      )}
+
       <div className="readout">
         <span className={'freq-readout' + (holdingOutOfTune ? ' out-of-tune' : '')}>
           {heard
@@ -549,6 +615,7 @@ export default function SightReading() {
       <NoteAccuracy
         stats={noteStats}
         fingerStats={fingerStats}
+        intervalStats={intervalStats}
         onReset={resetStats}
         onExport={exportStats}
         exportNote={exportNote}

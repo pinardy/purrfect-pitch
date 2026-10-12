@@ -1,7 +1,7 @@
 // Plans one exercise line from the settings: key, position(s), and notes,
 // including shifting lines that alternate between two positions.
 
-import { generateLine } from './generator';
+import { generateLine, generateMaterial } from './generator';
 import type { NoteStats } from './noteStats';
 import { noteWeakness } from './noteStats';
 import type { ReadingSettings } from './settings';
@@ -67,18 +67,28 @@ export function planLine(settings: ReadingSettings, stats: NoteStats, rng: () =>
   const notes: SpelledNote[] = [];
   const positions: (Position | null)[] = [];
   const shiftIndices: number[] = [];
+  // shaped material keeps one direction across the shifts of a line
+  const direction: 1 | -1 = rng() < 0.5 ? 1 : -1;
   for (const segment of segments) {
     if (notes.length > 0) shiftIndices.push(notes.length);
     const weight = settings.focusWeakNotes
       ? (n: SpelledNote) => 1 + 4 * noteWeakness(stats, n, segment.position)
       : undefined;
-    const part = generateLine({
-      ...common,
-      range: exerciseRange(settings, key, segment.position),
-      noteCount: segment.count,
-      prev: notes[notes.length - 1],
-      weight,
-    });
+    const range = exerciseRange(settings, key, segment.position);
+    const prev = notes[notes.length - 1];
+    const part =
+      settings.material === 'random'
+        ? generateLine({ ...common, range, noteCount: segment.count, prev, weight })
+        : generateMaterial({
+            kind: settings.material,
+            key,
+            rng,
+            range,
+            noteCount: segment.count,
+            prev,
+            direction,
+            weight,
+          });
     notes.push(...part);
     for (let i = 0; i < part.length; i++) positions.push(segment.position);
   }

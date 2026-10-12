@@ -2,7 +2,9 @@
 // positions, and the fingering of a written note within a position.
 
 import type { Key, Letter, SpelledNote } from './theory';
-import { keyAlterations, spell } from './theory';
+import { keyAlterations, LETTERS, letterIndex, spell } from './theory';
+
+export { letterIndex };
 
 export type Position = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
@@ -25,13 +27,6 @@ export const VIOLIN_STRINGS: ViolinString[] = [
   { name: 'A', numeral: 'II', letter: 'A', octave: 4 },
   { name: 'E', numeral: 'I', letter: 'E', octave: 5 },
 ];
-
-const LETTERS: Letter[] = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-
-/** Diatonic step index of a written pitch: C0 = 0, D0 = 1, … C1 = 7. */
-export function letterIndex(letter: Letter, octave: number): number {
-  return octave * 7 + LETTERS.indexOf(letter);
-}
 
 function letterAt(index: number): { letter: Letter; octave: number } {
   return { letter: LETTERS[((index % 7) + 7) % 7], octave: Math.floor(index / 7) };

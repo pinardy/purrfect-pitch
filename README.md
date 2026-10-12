@@ -38,6 +38,18 @@ An installable PWA (React + TypeScript + Vite) with three tools you can toggle b
   - **Practice history** — day-by-day first-try, in-tune and shift rates,
     filterable by position, as a chart or table; all stats export to CSV via
     the share sheet or a download.
+  - **Material** — lines can be random notes, the key's scale, its tonic
+    arpeggio, broken thirds (1-3-2-4-3-5), or an interval drill that
+    alternates the tonic with a free note; shaped lines run up or down and
+    turn at the edges of the range or hand frame, and continue across shifts.
+  - **Intervals** — label the interval between consecutive notes under the
+    staff (↑M3, ↓P5 …); every interval played is tracked in an **Intervals**
+    stats view showing which ones you misjudge or play out of tune.
+  - **Drone** — a sustained tonic or open-string reference pitch under the
+    line, so you tune by ear rather than to a needle. It sounds an octave or
+    two below the violin's range as a pure sine, and the microphone input is
+    notched at its exact frequency, so pitch detection is unaffected; a chip
+    above the readout mutes it. Use headphones if the mic still struggles.
   - **Flow and layout** — lines auto-advance after a moment or pause until
     tapped; presets (Position intro, Shifting drill, Intonation tightener,
     Test yourself) set several options at once; settings are grouped in

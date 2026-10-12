@@ -42,6 +42,9 @@ const COLORS: Record<NoteStatus, string> = {
 const CURSOR_FILL = 'rgba(244, 114, 166, 0.16)';
 const STRING_LABEL_COLOR = '#a78b6f';
 const GUIDE_NOTE_COLOR = '#b9a48c';
+const INTERVAL_COLOR = '#8a6a4b';
+/** extra height for the interval row under the staff */
+const INTERVAL_ROW = 14;
 
 const ANNOTATION_FONT = "'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Segoe UI', system-ui, sans-serif";
 
@@ -67,6 +70,8 @@ export interface RenderScoreOptions {
   shifts?: number[];
   /** per-note guide note drawn as a small grey grace note before a shift note */
   guideNotes?: (GuideNote | null)[];
+  /** interval from the previous note, drawn between the pair under the staff (entry 0 unused) */
+  intervals?: (string | null)[];
 }
 
 export interface GuideNote {
@@ -140,8 +145,9 @@ export function renderScore(
   if (o.notes.length === 0 || o.width < 100) return null;
 
   const fingerings = o.fingerings?.some((f) => f !== null) ? o.fingerings : undefined;
+  const intervals = o.intervals?.some((i) => i !== null) ? o.intervals : undefined;
   const pad = fingerings ? FINGERING_PAD : 0;
-  const height = HEIGHT + 2 * pad;
+  const height = HEIGHT + 2 * pad + (intervals ? INTERVAL_ROW : 0);
   const staveY = STAVE_Y + pad;
 
   const headerWidth = renderHeader(headerEl, o.keySignature, height, staveY);
@@ -190,9 +196,32 @@ export function renderScore(
   new Formatter().joinVoices([voice]).format([voice], width - 40);
   voice.draw(ctx, stave);
 
+  const svg = notesEl.querySelector('svg');
+
+  // interval names centred between each pair of notes, in their own row at the bottom
+  if (intervals && svg) {
+    const centers = staveNotes.map((sn) => {
+      const bb = sn.getBoundingBox();
+      return bb.x + bb.w / 2;
+    });
+    intervals.forEach((label, i) => {
+      if (!label || i === 0) return;
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', String((centers[i - 1] + centers[i]) / 2));
+      text.setAttribute('y', String(height - 4));
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('font-size', '10');
+      text.setAttribute('font-weight', 'bold');
+      text.setAttribute('font-family', ANNOTATION_FONT);
+      text.setAttribute('fill', INTERVAL_COLOR);
+      text.setAttribute('class', 'interval-label');
+      text.textContent = label;
+      svg.appendChild(text);
+    });
+  }
+
   // translucent cursor highlight behind the current note (needs post-draw layout)
   const currentNote = staveNotes[o.cursor];
-  const svg = notesEl.querySelector('svg');
   if (currentNote && svg) {
     const bb = currentNote.getBoundingBox();
     const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');

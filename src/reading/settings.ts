@@ -2,6 +2,7 @@
 
 import type { Key, KeyMode } from './theory';
 import { MAJOR_TONICS, MINOR_TONICS } from './theory';
+import type { Material } from './generator';
 import { pick } from './generator';
 import type { Position, StringName, ViolinString } from './violin';
 import { POSITIONS, positionRange, VIOLIN_STRINGS } from './violin';
@@ -18,6 +19,9 @@ export type StringFocus = 'auto' | StringName;
 
 /** feedback when a note registers */
 export type CueMode = 'off' | 'haptic' | 'sound' | 'both';
+
+/** sustained reference pitch under the line: the key's tonic or an open string */
+export type DroneMode = 'off' | 'tonic' | StringName;
 
 export interface ReadingSettings {
   difficulty: Difficulty;
@@ -51,6 +55,11 @@ export interface ReadingSettings {
   /** keep the finished line on screen until "Next line" is tapped */
   pauseAfterLine: boolean;
   cue: CueMode;
+  /** what the line is made of: random notes, a scale, an arpeggio, broken thirds, or an interval drill */
+  material: Material;
+  /** label the interval between consecutive notes under the staff */
+  showIntervals: boolean;
+  drone: DroneMode;
 }
 
 export interface DifficultyPreset {
@@ -120,7 +129,18 @@ export const DEFAULT_READING_SETTINGS: ReadingSettings = {
   settleMs: 0,
   pauseAfterLine: false,
   cue: 'off',
+  material: 'random',
+  showIntervals: false,
+  drone: 'off',
 };
+
+export const MATERIALS: { value: Material; label: string; hint: string }[] = [
+  { value: 'random', label: 'Random', hint: 'random notes within the range' },
+  { value: 'scale', label: 'Scale', hint: 'the key\'s scale, turning at the edges of the range' },
+  { value: 'arpeggio', label: 'Arpeggio', hint: 'the tonic triad through the range' },
+  { value: 'thirds', label: 'Broken thirds', hint: '1-3-2-4-3-5 through the scale' },
+  { value: 'intervals', label: 'Intervals', hint: 'the tonic alternating with a free note, so every interval is heard from the same anchor' },
+];
 
 export const MAX_SHIFTS_PER_LINE = 3;
 
@@ -185,6 +205,31 @@ export const PRACTICE_PRESETS: PracticePreset[] = [
       settleMs: 600,
       fingeringDisplay: 'after-miss',
       focusWeakNotes: true,
+    },
+  },
+  {
+    id: 'scales',
+    label: 'Scales in position',
+    hint: '3rd position, scale lines of 16 notes with a tonic drone',
+    apply: {
+      material: 'scale',
+      position: 3,
+      shifting: false,
+      noteCount: 16,
+      fingeringDisplay: 'always',
+      drone: 'tonic',
+      focusWeakNotes: false,
+    },
+  },
+  {
+    id: 'ear',
+    label: 'Interval ear',
+    hint: 'interval drill from the tonic with labels and a tonic drone',
+    apply: {
+      material: 'intervals',
+      showIntervals: true,
+      drone: 'tonic',
+      intonationTolerance: 15,
     },
   },
   {

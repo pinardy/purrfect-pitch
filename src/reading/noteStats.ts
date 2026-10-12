@@ -174,3 +174,23 @@ export function intonationTendency(s: NoteStat): 'sharp' | 'flat' | 'both' | nul
   if (flat > sharp) return 'flat';
   return 'both';
 }
+
+const INTERVAL_STORAGE_KEY = 'reading.intervalStats';
+
+/** Per-interval stats keyed by the interval name with direction, e.g. "↑M3". */
+export function loadIntervalStats(): NoteStats {
+  try {
+    const raw = localStorage.getItem(INTERVAL_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as NoteStats) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveIntervalStats(stats: NoteStats): void {
+  try {
+    localStorage.setItem(INTERVAL_STORAGE_KEY, JSON.stringify(stats));
+  } catch {
+    // storage unavailable — stats just won't persist
+  }
+}

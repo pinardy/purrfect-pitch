@@ -61,3 +61,52 @@ export function hapticCue(kind: 'correct' | 'wrong'): void {
     // not supported
   }
 }
+
+// ---- Drone ----
+
+let drone: { oscs: OscillatorNode[]; gain: GainNode } | null = null;
+const DRONE_GAIN = 0.12;
+
+/**
+ * A sustained reference pitch. It is a pure sine on purpose: the microphone
+ * hears the drone through the speaker, and a single partial can be removed
+ * exactly with a notch filter before pitch detection, whereas a richer
+ * timbre would leave harmonics inside the violin's range. Calling it again
+ * glides to the new pitch instead of restarting.
+ */
+export async function startDrone(hz: number): Promise<void> {
+  ctx ??= new AudioContext();
+  if (ctx.state === 'suspended') await ctx.resume();
+  const now = ctx.currentTime;
+  if (drone) {
+    drone.oscs[0].frequency.setTargetAtTime(hz, now, 0.05);
+    drone.gain.gain.setTargetAtTime(DRONE_GAIN, now, 0.1);
+    return;
+  }
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(DRONE_GAIN, now + 0.4);
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = hz;
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(now);
+  drone = { oscs: [osc], gain };
+}
+
+export function stopDrone(): void {
+  if (!drone || !ctx) return;
+  const { oscs, gain } = drone;
+  drone = null;
+  const now = ctx.currentTime;
+  gain.gain.setTargetAtTime(0, now, 0.08);
+  for (const osc of oscs) osc.stop(now + 0.5);
+  window.setTimeout(() => {
+    for (const osc of oscs) osc.disconnect();
+    gain.disconnect();
+  }, 600);
+}
+
+export function isDronePlaying(): boolean {
+  return drone !== null;
+}

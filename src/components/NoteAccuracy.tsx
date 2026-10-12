@@ -14,13 +14,15 @@ interface Props {
   stats: NoteStats;
   /** per finger and position, keyed "finger@position" */
   fingerStats: NoteStats;
+  /** per interval, keyed by name with direction, e.g. "↑M3" */
+  intervalStats: NoteStats;
   onReset: () => void;
   onExport: () => void;
   /** brief confirmation after an export */
   exportNote?: string | null;
 }
 
-type View = 'reading' | 'intonation' | 'fingers';
+type View = 'reading' | 'intonation' | 'fingers' | 'intervals';
 
 function grade(acc: number): 'good' | 'ok' | 'bad' {
   return acc >= 0.9 ? 'good' : acc >= 0.7 ? 'ok' : 'bad';
@@ -67,7 +69,14 @@ function toRow(key: string, label: string, tag: string | null, s: NoteStat): Row
  * intonation (with average drift and tendency), or per-finger intonation by
  * position, which is the diagnosis a teacher would give.
  */
-export default function NoteAccuracy({ stats, fingerStats, onReset, onExport, exportNote }: Props) {
+export default function NoteAccuracy({
+  stats,
+  fingerStats,
+  intervalStats,
+  onReset,
+  onExport,
+  exportNote,
+}: Props) {
   const [view, setView] = useState<View>('reading');
   const noteRows = Object.entries(stats).map(([key, s]) => {
     const { name, position } = parseStatKey(key);
@@ -77,15 +86,20 @@ export default function NoteAccuracy({ stats, fingerStats, onReset, onExport, ex
     const { finger, position } = parseFingerKey(key);
     return toRow(key, FINGER_LABEL[finger] ?? `finger ${finger}`, positionOrdinal(position), s);
   });
+  const intervalRows = Object.entries(intervalStats).map(([key, s]) => toRow(key, key, null, s));
   if (noteRows.length === 0) return null;
 
   const byIntonation = (a: Row, b: Row) => a.intonation - b.intonation || b.attempts - a.attempts;
+  const byReading = (a: Row, b: Row) => a.acc - b.acc || b.attempts - a.attempts;
   const rows =
     view === 'reading'
-      ? [...noteRows].sort((a, b) => a.acc - b.acc || b.attempts - a.attempts)
+      ? [...noteRows].sort(byReading)
       : view === 'intonation'
         ? [...noteRows].sort(byIntonation)
-        : [...fingerRows].sort(byIntonation);
+        : view === 'fingers'
+          ? [...fingerRows].sort(byIntonation)
+          : // intervals: misjudged (wrong pitch) first, then out of tune
+            [...intervalRows].sort((a, b) => byReading(a, b) || byIntonation(a, b));
 
   const attempts = noteRows.reduce((sum, r) => sum + r.attempts, 0);
   const hits = noteRows.reduce((sum, r) => sum + r.hits, 0);
@@ -97,6 +111,7 @@ export default function NoteAccuracy({ stats, fingerStats, onReset, onExport, ex
     { value: 'reading', label: 'Reading' },
     { value: 'intonation', label: 'Intonation' },
     { value: 'fingers', label: 'Fingers' },
+    { value: 'intervals', label: 'Intervals' },
   ];
 
   return (
@@ -117,13 +132,17 @@ export default function NoteAccuracy({ stats, fingerStats, onReset, onExport, ex
       </div>
       {rows.length === 0 ? (
         <p className="hint note-acc-empty">
-          Finger stats appear once you have played lines in a position.
+          {view === 'fingers'
+            ? 'Finger stats appear once you have played lines in a position.'
+            : 'Interval stats appear once you have played a few lines.'}
         </p>
       ) : (
         <div className={'note-acc-list' + (view === 'fingers' ? ' fingers' : '')}>
           {rows.map((r) => {
-            const value = view === 'reading' ? r.acc : r.intonation;
-            const count = view === 'reading' ? r.hits : r.inTune;
+            // intervals are judged on reading (the right note) with intonation as the detail
+            const byAccuracy = view === 'reading' || view === 'intervals';
+            const value = byAccuracy ? r.acc : r.intonation;
+            const count = byAccuracy ? r.hits : r.inTune;
             return (
               <div key={r.key} className="note-acc-row" data-grade={grade(value)}>
                 <span className="note-acc-name">
@@ -136,10 +155,18 @@ export default function NoteAccuracy({ stats, fingerStats, onReset, onExport, ex
                 <span className="note-acc-pct">
                   {Math.round(value * 100)}% · {count}/{r.attempts}
                 </span>
-                {view !== 'reading' && r.tendency && (
+                {view === 'intervals' ? (
                   <span className="note-acc-sub">
-                    {TENDENCY_LABEL[r.tendency]} · avg {formatCents(r.avgCents)}
+                    {Math.round(r.intonation * 100)}% in tune
+                    {r.tendency ? ` · ${TENDENCY_LABEL[r.tendency]} · avg ${formatCents(r.avgCents)}` : ''}
                   </span>
+                ) : (
+                  view !== 'reading' &&
+                  r.tendency && (
+                    <span className="note-acc-sub">
+                      {TENDENCY_LABEL[r.tendency]} · avg {formatCents(r.avgCents)}
+                    </span>
+                  )
                 )}
               </div>
             );

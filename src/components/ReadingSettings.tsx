@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type {
   CueMode,
   Difficulty,
+  DroneMode,
   FingeringDisplay,
   PositionSetting,
   ReadingSettings as Settings,
@@ -9,6 +10,7 @@ import type {
 } from '../reading/settings';
 import {
   INTONATION_TOLERANCES,
+  MATERIALS,
   MAX_SHIFTS_PER_LINE,
   PRACTICE_PRESETS,
   SETTLE_TIMES,
@@ -67,6 +69,12 @@ const CUE_MODES: { value: CueMode; label: string }[] = [
 ];
 
 const NOTE_COUNTS = [4, 8, 12, 16];
+
+const DRONES: { value: DroneMode; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'tonic', label: 'Tonic' },
+  ...VIOLIN_STRINGS.map((s) => ({ value: s.name as DroneMode, label: `${s.name} string` })),
+];
 
 interface Props {
   settings: Settings;
@@ -175,6 +183,10 @@ export default function ReadingSettings({ settings, onChange, onClose }: Props) 
 
   const readingCurrent = [
     activeDifficulty?.label.toLowerCase(),
+    settings.material !== 'random'
+      ? MATERIALS.find((m) => m.value === settings.material)?.label.toLowerCase()
+      : null,
+    settings.showIntervals ? 'intervals labelled' : null,
     settings.keyMode === 'fixed'
       ? `${settings.fixedKey.tonic} ${settings.fixedKey.mode}`
       : settings.keyMode === 'random-major'
@@ -201,6 +213,7 @@ export default function ReadingSettings({ settings, onChange, onClose }: Props) 
 
   const intonationCurrent = [
     settings.intonationTolerance === null ? 'not checked' : `±${settings.intonationTolerance}¢`,
+    settings.drone !== 'off' ? `${settings.drone === 'tonic' ? 'tonic' : settings.drone + ' string'} drone` : null,
     settings.intonationTolerance !== null && settings.settleMs > 0 ? `${settings.settleMs / 1000}s settle` : null,
     settings.cue !== 'off' ? `cue: ${CUE_MODES.find((c) => c.value === settings.cue)?.label.toLowerCase()}` : null,
   ]
@@ -281,6 +294,28 @@ export default function ReadingSettings({ settings, onChange, onClose }: Props) 
               ))}
             </select>
           )}
+
+          <span className="field-label">Material</span>
+          <Chips
+            ariaLabel="Material"
+            options={MATERIALS}
+            value={settings.material}
+            onChange={(v) => set('material', v)}
+          />
+          <p className="hint">
+            {MATERIALS.find((m) => m.value === settings.material)?.hint}. Scales, arpeggios and
+            thirds run up or down at random and turn around at the edges of the range (or of
+            the position&apos;s hand frame).
+          </p>
+          <Check
+            checked={settings.showIntervals}
+            onChange={(v) => set('showIntervals', v)}
+            label="Label intervals under the staff (↑M3, ↓P5 …)"
+          />
+          <p className="hint">
+            Every interval you play is also tracked in the stats panel, so you can see which
+            ones you misjudge or play out of tune.
+          </p>
 
           <span className="field-label">Notes per line</span>
           <Chips
@@ -429,6 +464,16 @@ export default function ReadingSettings({ settings, onChange, onClose }: Props) 
               </p>
             </>
           )}
+
+          <span className="field-label">Drone</span>
+          <Chips ariaLabel="Drone" options={DRONES} value={settings.drone} onChange={(v) => set('drone', v)} />
+          <p className="hint">
+            A sustained reference pitch under the line, so you tune by ear against it rather
+            than to a needle: the key&apos;s tonic, or an open string, sounded an octave or two
+            below the violin&apos;s range so the microphone ignores it. If the mic struggles
+            while the drone plays, use headphones. Tap the drone chip above the readout to
+            mute it.
+          </p>
 
           <span className="field-label">Cue when a note registers</span>
           <Chips ariaLabel="Cue" options={CUE_MODES} value={settings.cue} onChange={(v) => set('cue', v)} />

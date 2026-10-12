@@ -43,7 +43,8 @@ export const DEFAULT_MATCHER_CONFIG: MatcherConfig = {
   rmsGate: 0.01,
   minStableFrames: 5,
   silenceFrames: 4,
-  minHz: 160,
+  // just under the violin's open G (196 Hz); drones sit below this and are ignored
+  minHz: 180,
   // 7th position on the E string reaches A6 (1760 Hz); leave room for sharp keys
   maxHz: 2200,
   maxCentsOff: null,

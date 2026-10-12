@@ -14,6 +14,13 @@ const LETTER_SEMITONE: Record<Letter, number> = {
   C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11,
 };
 
+export const LETTERS: Letter[] = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+
+/** Diatonic step index of a written pitch: C0 = 0, D0 = 1, … C1 = 7. */
+export function letterIndex(letter: Letter, octave: number): number {
+  return octave * 7 + LETTERS.indexOf(letter);
+}
+
 const ACC_OFFSET: Record<Acc, number> = { '': 0, '#': 1, b: -1 };
 
 export function spell(letter: Letter, acc: Acc, octave: number): SpelledNote {
@@ -101,4 +108,31 @@ export function vexKeySignature(key: Key): string {
 
 export function keyLabel(key: Key): string {
   return `${key.tonic} ${key.mode}`;
+}
+
+// ---- Intervals ----
+
+/** Semitones in the major/perfect form of each simple interval (unison … seventh). */
+const REFERENCE_SEMITONES = [0, 2, 4, 5, 7, 9, 11];
+
+/**
+ * Name of the interval between two written notes, with its direction, e.g.
+ * "↑M3", "↓P5", "↑m10"; "P1" for a unison. Quality comes from the spelling,
+ * so C–E♭ is m3 and C–D♯ is A2.
+ */
+export function intervalName(from: SpelledNote, to: SpelledNote): string {
+  const up = to.midi > from.midi || (to.midi === from.midi && letterIndex(to.letter, to.octave) > letterIndex(from.letter, from.octave));
+  const [lo, hi] = up ? [from, to] : [to, from];
+  const letters = letterIndex(hi.letter, hi.octave) - letterIndex(lo.letter, lo.octave);
+  const generic = letters + 1;
+  const simple = ((generic - 1) % 7) + 1;
+  const octaves = Math.floor((generic - 1) / 7);
+  const diff = hi.midi - lo.midi - (REFERENCE_SEMITONES[simple - 1] + 12 * octaves);
+  const perfect = simple === 1 || simple === 4 || simple === 5;
+  const quality = perfect
+    ? diff === 0 ? 'P' : diff > 0 ? 'A'.repeat(diff) : 'd'.repeat(-diff)
+    : diff === 0 ? 'M' : diff === -1 ? 'm' : diff > 0 ? 'A'.repeat(diff) : 'd'.repeat(-diff - 1);
+  const name = `${quality}${generic}`;
+  if (from.midi === to.midi && letters === 0) return name;
+  return (up ? '↑' : '↓') + name;
 }

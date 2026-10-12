@@ -1312,3 +1312,19 @@ button {
     flex: 1;
   }
 }
+
+/* ---- Drone chip ---- */
+
+.drone-chip {
+  align-self: center;
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+@media (orientation: landscape) and (min-width: 700px) {
+  .reading .drone-chip {
+    grid-area: 4 / 2;
+    justify-self: center;
+  }
+}
